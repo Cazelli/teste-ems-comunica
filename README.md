@@ -21,7 +21,7 @@ streamlit run app.py
 ```
 
 ## Publicar no GitHub / Streamlit Community Cloud
-1. Suba `app.py`, `requirements.txt`, `README.md` e os CSVs para o repositório.
+1. Suba `app.py`, `requirements.txt`, `README.md` e os parquets para o repositório.
 2. No Streamlit Community Cloud, conecte o repositório.
 3. Defina `app.py` como arquivo principal.
 4. Deploy.
