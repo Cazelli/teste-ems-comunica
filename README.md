@@ -10,9 +10,9 @@ App em Streamlit para explorar:
 ## Arquivos esperados
 Coloque estes arquivos na mesma pasta do app:
 - `app.py`
-- `df_interessados.csv`
-- `df_COM_EMAIL.csv`
-- `df_COM_IM.csv`
+- `df_interessados.parquet`
+- `df_COM_EMAIL.parquet`
+- `df_COM_IM.parquet`
 
 ## Rodar localmente
 ```bash
