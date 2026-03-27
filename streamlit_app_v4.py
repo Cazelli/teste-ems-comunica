@@ -452,8 +452,10 @@ def main():
         100 * interested_with_contact_filtered / total_ucs_interessadas if total_ucs_interessadas else 0
     )
 
-    # UCs contactadas must come only from IM + Email files, ignoring df_interessados as a source
-    contacted_ucs_filtered = f_com["NUM_UC"].dropna().nunique()
+    #  UCs únicas vindas dos arquivos IM + Email (sem depender do df_interessados)
+    im_ucs = set(comunicacoes.loc[comunicacoes["Canal"] != "Email", "NUM_UC"].dropna())
+    email_ucs = set(comunicacoes.loc[comunicacoes["Canal"] == "Email", "NUM_UC"].dropna())
+    contacted_ucs_filtered = len(im_ucs.union(email_ucs))
     pct_contacted_that_interested = (
         100 * interested_with_contact_filtered / contacted_ucs_filtered if contacted_ucs_filtered else 0
     )
