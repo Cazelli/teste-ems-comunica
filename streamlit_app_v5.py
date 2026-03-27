@@ -571,8 +571,8 @@ def main():
 
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader("UCs interessadas acumuladas")
-        plot_cumulative_interested(f_int[f_int["IND_SITUACAO"].isin(INTEREST_STATUSES)])
+        st.subheader("UCs interessadas acumuladas por plano")
+        plot_cumulative_interested_by_plan(f_int)
     with col2:
         st.subheader("Mensagens acumuladas")
         plot_cumulative_messages(f_com[f_com["Canal"].isin(["Email", "WhatsApp", "SMS", "Push"])])
