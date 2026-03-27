@@ -410,15 +410,47 @@ def plot_cumulative_interested_by_plan(df: pd.DataFrame):
         st.info("Sem dados de UCs interessadas no período.")
         return
 
+    base["Data"] = base["DTH_INTERESSE"].dt.floor("D")
+
+    # Daily unique UCs by plan
     daily = (
-        base.assign(Data=base["DTH_INTERESSE"].dt.floor("D"))
-        .groupby(["Data", "PLANO_DETALHADO", "PRAZO_PLANO"], as_index=False)["NUM_UC"]
+        base.groupby(["Data", "PLANO_DETALHADO", "PRAZO_PLANO"], as_index=False)["NUM_UC"]
         .nunique()
         .rename(columns={"NUM_UC": "UCs interessadas"})
+    )
+
+    # Complete date range from first to last date in filtered data
+    all_dates = pd.date_range(
+        start=base["Data"].min(),
+        end=base["Data"].max(),
+        freq="D"
+    )
+
+    # One row per plan
+    plans = daily[["PLANO_DETALHADO", "PRAZO_PLANO"]].drop_duplicates()
+
+    # Cartesian product: every date x every plan
+    full_index = (
+        plans.assign(_key=1)
+        .merge(pd.DataFrame({"Data": all_dates, "_key": 1}), on="_key")
+        .drop(columns="_key")
+    )
+
+    # Merge actual counts; missing days become zero
+    full_daily = (
+        full_index.merge(
+            daily,
+            on=["Data", "PLANO_DETALHADO", "PRAZO_PLANO"],
+            how="left"
+        )
+        .fillna({"UCs interessadas": 0})
         .sort_values(["PLANO_DETALHADO", "Data"])
     )
 
-    daily["Acumulado"] = daily.groupby("PLANO_DETALHADO")["UCs interessadas"].cumsum()
+    # Continuous cumulative line for every plan
+    full_daily["Acumulado"] = (
+        full_daily.groupby("PLANO_DETALHADO")["UCs interessadas"].cumsum()
+    )
 
     symbol_map = {
         "Trimestral": "triangle-up",
@@ -427,7 +459,7 @@ def plot_cumulative_interested_by_plan(df: pd.DataFrame):
     }
 
     fig = px.line(
-        daily,
+        full_daily,
         x="Data",
         y="Acumulado",
         color="PLANO_DETALHADO",
@@ -436,7 +468,7 @@ def plot_cumulative_interested_by_plan(df: pd.DataFrame):
         markers=True,
     )
 
-    fig.update_traces(marker=dict(size=9))
+    fig.update_traces(marker=dict(size=8))
     fig.update_layout(
         margin=dict(l=0, r=0, t=20, b=0),
         yaxis_title="UCs interessadas acumuladas",
@@ -568,7 +600,7 @@ def main():
     )
 
     build_map(f_int)
-    st.subheader("UCs interessadas acumuladas por plano")
+    st.subheader("Linha do tempo de Interesse")
     plot_cumulative_interested_by_plan(f_int)
     
     st.subheader("Mensagens acumuladas")
