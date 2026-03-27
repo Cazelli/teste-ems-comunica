@@ -7,7 +7,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-st.set_page_config(page_title="BI Comunicação Plano Fixo", page_icon="📊", layout="wide")
+st.set_page_config(page_title="BI Comunicação Fatura Fixa", page_icon="📊", layout="wide")
 
 APP_DIR = Path(__file__).parent.resolve()
 DATA_SEARCH_DIRS = [
@@ -362,7 +362,7 @@ def build_map(df: pd.DataFrame):
         size="UCs",
         hover_name="MUNICIPIO",
         hover_data={"UCs": True, "LAT": False, "LON": False},
-        zoom=8,
+        zoom=6,
         center={"lat": -20.5, "lon": -54.6},
         height=480,
         text="MUNICIPIO",
