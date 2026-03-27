@@ -568,15 +568,12 @@ def main():
     )
 
     build_map(f_int)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("UCs interessadas acumuladas por plano")
-        plot_cumulative_interested_by_plan(f_int)
-    with col2:
-        st.subheader("Mensagens acumuladas")
-        plot_cumulative_messages(f_com[f_com["Canal"].isin(["Email", "WhatsApp", "SMS", "Push"])])
-
+    st.subheader("UCs interessadas acumuladas por plano")
+    plot_cumulative_interested_by_plan(f_int)
+    
+    st.subheader("Mensagens acumuladas")
+    plot_cumulative_messages(f_com[f_com["Canal"].isin(["Email", "WhatsApp", "SMS", "Push"])])
+    
     col3, col4 = st.columns(2)
     with col3:
         plot_bar(f_int[f_int["IND_SITUACAO"].isin(INTEREST_STATUSES)], "PLANO_DETALHADO", "UCs interessadas por plano")
