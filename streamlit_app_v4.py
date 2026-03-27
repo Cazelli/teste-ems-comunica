@@ -362,7 +362,7 @@ def build_map(df: pd.DataFrame):
         size="UCs",
         hover_name="MUNICIPIO",
         hover_data={"UCs": True, "LAT": False, "LON": False},
-        zoom=12,
+        zoom=8,
         center={"lat": -20.5, "lon": -54.6},
         height=480,
         text="MUNICIPIO",
