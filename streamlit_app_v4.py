@@ -362,7 +362,7 @@ def build_map(df: pd.DataFrame):
         size="UCs",
         hover_name="MUNICIPIO",
         hover_data={"UCs": True, "LAT": False, "LON": False},
-        zoom=4.2,
+        zoom=12,
         center={"lat": -20.5, "lon": -54.6},
         height=480,
         text="MUNICIPIO",
@@ -370,7 +370,7 @@ def build_map(df: pd.DataFrame):
     fig.update_traces(
         textposition="top center",
         textfont=dict(color="black", size=11),
-        marker=dict(opacity=0.8)
+        marker=dict(size=12, opacity=0.9)        
     )
     fig.update_layout(
         mapbox_style="carto-positron",
