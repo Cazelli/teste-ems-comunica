@@ -380,7 +380,7 @@ def build_map(df: pd.DataFrame):
         size="UCs",
         hover_name="MUNICIPIO",
         hover_data={"UCs": True, "LAT": False, "LON": False},
-        zoom=4.2,
+        zoom=6.2,
         center={"lat": -20.5, "lon": -54.6},
         height=480,
         text="MUNICIPIO",
@@ -519,7 +519,7 @@ def main():
             ("Mensagens por SMS", format_int(total_messages_by_channel.get("SMS", 0)), "Total de mensagens de SMS, sem aplicar filtros."),
             ("Mensagens por Push", format_int(total_messages_by_channel.get("Push", 0)), "Total de mensagens de Push, sem aplicar filtros."),
         ],
-        n_cols=7,
+        n_cols=4,
     )
 
     render_metric_block(
