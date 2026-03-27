@@ -248,6 +248,19 @@ def load_data():
 def apply_filters(interessados: pd.DataFrame, comunicacoes: pd.DataFrame):
     st.sidebar.header("Filtros")
 
+    min_date = min(
+        x for x in [interessados["DTH_INTERESSE"].min(), comunicacoes["Data"].min()] if pd.notna(x)
+    )
+    max_date = max(
+        x for x in [interessados["DTH_INTERESSE"].max(), comunicacoes["Data"].max()] if pd.notna(x)
+    )
+    date_range = st.sidebar.date_input(
+        "Período",
+        value=(min_date.date(), max_date.date()),
+        min_value=min_date.date(),
+        max_value=max_date.date(),
+    )
+    
     municipios = sorted(x for x in interessados["MUNICIPIO"].dropna().unique().tolist() if x)
     municipio = st.sidebar.selectbox("Município", ["Todos"] + municipios, index=0)
 
@@ -288,19 +301,7 @@ def apply_filters(interessados: pd.DataFrame, comunicacoes: pd.DataFrame):
     template_options.extend(leftovers)
 
     template_sel = st.sidebar.multiselect("Template / Ação", template_options, default=template_options)
-
-    min_date = min(
-        x for x in [interessados["DTH_INTERESSE"].min(), comunicacoes["Data"].min()] if pd.notna(x)
-    )
-    max_date = max(
-        x for x in [interessados["DTH_INTERESSE"].max(), comunicacoes["Data"].max()] if pd.notna(x)
-    )
-    date_range = st.sidebar.date_input(
-        "Período",
-        value=(min_date.date(), max_date.date()),
-        min_value=min_date.date(),
-        max_value=max_date.date(),
-    )
+    
     if isinstance(date_range, tuple) and len(date_range) == 2:
         dt_ini = pd.Timestamp(date_range[0])
         dt_fim = pd.Timestamp(date_range[1]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
