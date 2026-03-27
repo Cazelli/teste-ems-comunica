@@ -1,5 +1,4 @@
 import re
-from io import BytesIO
 from pathlib import Path
 
 import folium
@@ -23,6 +22,8 @@ DATA_SEARCH_DIRS = [
     APP_DIR.parent,
     APP_DIR.parent / "data",
 ]
+
+VALID_INTEREST_STATUS = ["A", "I", "R", "D", "X"]
 
 PLAN_ID_MAP = {
     1: "Trimestral com informe Mensal",
@@ -59,7 +60,6 @@ REQUIRED_FILES = {
 }
 
 
-
 def parse_coord(value):
     if pd.isna(value):
         return np.nan, np.nan
@@ -72,7 +72,6 @@ def parse_coord(value):
     return lat, lon
 
 
-
 def find_parquet_file(filename: str):
     for base in DATA_SEARCH_DIRS:
         candidate = base / filename
@@ -81,12 +80,7 @@ def find_parquet_file(filename: str):
     return None
 
 
-
-def read_parquet_source(uploaded_file, expected_filename: str):
-    if uploaded_file is not None:
-        data = uploaded_file.getvalue()
-        return pd.read_parquet(BytesIO(data))
-
+def read_parquet_source(expected_filename: str):
     file_path = find_parquet_file(expected_filename)
     if file_path is None:
         searched = "\n".join(str(p / expected_filename) for p in DATA_SEARCH_DIRS)
@@ -94,31 +88,6 @@ def read_parquet_source(uploaded_file, expected_filename: str):
             f"Arquivo não encontrado: {expected_filename}\n\nProcurei em:\n{searched}"
         )
     return pd.read_parquet(file_path)
-
-
-
-def build_sidebar_uploaders():
-    with st.sidebar:
-        st.markdown("---")
-        st.subheader("Arquivos Parquet")
-        st.caption("O app usa apenas .parquet. Você pode manter os arquivos no repositório ou enviar aqui.")
-        uploaded_interessados = st.file_uploader(
-            "df_interessados.parquet",
-            type=["parquet"],
-            key="upload_interessados_parquet",
-        )
-        uploaded_email = st.file_uploader(
-            "df_COM_EMAIL.parquet",
-            type=["parquet"],
-            key="upload_email_parquet",
-        )
-        uploaded_im = st.file_uploader(
-            "df_COM_IM.parquet",
-            type=["parquet"],
-            key="upload_im_parquet",
-        )
-    return uploaded_interessados, uploaded_email, uploaded_im
-
 
 
 def enrich_interessados(interessados: pd.DataFrame) -> pd.DataFrame:
@@ -134,6 +103,9 @@ def enrich_interessados(interessados: pd.DataFrame) -> pd.DataFrame:
     for col in date_cols:
         if col in interessados.columns:
             interessados[col] = pd.to_datetime(interessados[col], errors="coerce")
+
+    if "NUM_UC" in interessados.columns:
+        interessados["NUM_UC"] = pd.to_numeric(interessados["NUM_UC"], errors="coerce").astype("Int64")
 
     if "COORDENADA GEOGRAFICA" in interessados.columns:
         coords = interessados["COORDENADA GEOGRAFICA"].apply(parse_coord)
@@ -164,7 +136,6 @@ def enrich_interessados(interessados: pd.DataFrame) -> pd.DataFrame:
     return interessados
 
 
-
 def enrich_email(email: pd.DataFrame) -> pd.DataFrame:
     email = email.copy()
     if "DataEnvio" in email.columns:
@@ -176,7 +147,6 @@ def enrich_email(email: pd.DataFrame) -> pd.DataFrame:
     email["data_evento"] = email.get("DataEnvio", pd.NaT)
     email["uc_join"] = email.get("UC", pd.Series(index=email.index, dtype="Int64"))
     return email
-
 
 
 def enrich_im(im: pd.DataFrame) -> pd.DataFrame:
@@ -193,18 +163,10 @@ def enrich_im(im: pd.DataFrame) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
-def load_data_cached(interessados_bytes, email_bytes, im_bytes):
-    up_i = BytesIO(interessados_bytes) if interessados_bytes is not None else None
-    up_e = BytesIO(email_bytes) if email_bytes is not None else None
-    up_m = BytesIO(im_bytes) if im_bytes is not None else None
-
-    interessados = pd.read_parquet(up_i) if up_i is not None else read_parquet_source(None, REQUIRED_FILES["interessados"])
-    email = pd.read_parquet(up_e) if up_e is not None else read_parquet_source(None, REQUIRED_FILES["email"])
-    im = pd.read_parquet(up_m) if up_m is not None else read_parquet_source(None, REQUIRED_FILES["im"])
-
-    interessados = enrich_interessados(interessados)
-    email = enrich_email(email)
-    im = enrich_im(im)
+def load_data():
+    interessados = enrich_interessados(read_parquet_source(REQUIRED_FILES["interessados"]))
+    email = enrich_email(read_parquet_source(REQUIRED_FILES["email"]))
+    im = enrich_im(read_parquet_source(REQUIRED_FILES["im"]))
 
     uc_dims_cols = [
         "NUM_UC", "MUNICIPIO", "ID_PLANO", "plano_nome", "prazo_plano", "informe",
@@ -219,15 +181,6 @@ def load_data_cached(interessados_bytes, email_bytes, im_bytes):
     comunicacoes["tem_dimensao_uc"] = comunicacoes["MUNICIPIO"].notna() if "MUNICIPIO" in comunicacoes.columns else False
 
     return interessados, email, im, comunicacoes
-
-
-
-def load_data(uploaded_interessados=None, uploaded_email=None, uploaded_im=None):
-    b_i = uploaded_interessados.getvalue() if uploaded_interessados is not None else None
-    b_e = uploaded_email.getvalue() if uploaded_email is not None else None
-    b_m = uploaded_im.getvalue() if uploaded_im is not None else None
-    return load_data_cached(b_i, b_e, b_m)
-
 
 
 def filter_interessados(df, municipios, prazos, informes, bandeiras, rural_sel, planos, status_sel, data_inicio, data_fim):
@@ -251,7 +204,6 @@ def filter_interessados(df, municipios, prazos, informes, bandeiras, rural_sel, 
     if data_fim is not None and "DTH_INTERESSE" in out.columns:
         out = out[out["DTH_INTERESSE"] <= pd.Timestamp(data_fim) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)]
     return out
-
 
 
 def filter_comunicacoes(df, municipios, prazos, informes, bandeiras, rural_sel, planos, canais, comunicacoes_sel, data_inicio, data_fim):
@@ -279,25 +231,38 @@ def filter_comunicacoes(df, municipios, prazos, informes, bandeiras, rural_sel, 
     return out
 
 
+def interest_base(df: pd.DataFrame) -> pd.DataFrame:
+    if "IND_SITUACAO" not in df.columns:
+        return df.copy()
+    return df[df["IND_SITUACAO"].isin(VALID_INTEREST_STATUS)].copy()
+
+
+def unique_interest_ucs(df: pd.DataFrame) -> int:
+    if "NUM_UC" not in df.columns:
+        return 0
+    return df["NUM_UC"].dropna().nunique()
+
 
 def cumulative_interest(df):
-    base = df.dropna(subset=["DTH_INTERESSE"]).copy() if "DTH_INTERESSE" in df.columns else pd.DataFrame()
+    base = interest_base(df)
+    if "DTH_INTERESSE" not in base.columns:
+        return pd.DataFrame(columns=["Data", "UCs interessadas no dia", "Acumulado"])
+    base = base.dropna(subset=["DTH_INTERESSE", "NUM_UC"]).copy()
     if base.empty:
-        return pd.DataFrame(columns=["Data", "Interesses do dia", "Acumulado"])
+        return pd.DataFrame(columns=["Data", "UCs interessadas no dia", "Acumulado"])
     daily = (
-        base.groupby(base["DTH_INTERESSE"].dt.date)
-        .size()
-        .rename("Interesses do dia")
+        base.groupby(base["DTH_INTERESSE"].dt.date)["NUM_UC"]
+        .nunique()
+        .rename("UCs interessadas no dia")
         .reset_index()
         .rename(columns={"DTH_INTERESSE": "Data"})
     )
     daily["Data"] = pd.to_datetime(daily["Data"])
     all_days = pd.DataFrame({"Data": pd.date_range(daily["Data"].min(), daily["Data"].max(), freq="D")})
-    daily = all_days.merge(daily, on="Data", how="left").fillna({"Interesses do dia": 0})
-    daily["Interesses do dia"] = daily["Interesses do dia"].astype(int)
-    daily["Acumulado"] = daily["Interesses do dia"].cumsum()
+    daily = all_days.merge(daily, on="Data", how="left").fillna({"UCs interessadas no dia": 0})
+    daily["UCs interessadas no dia"] = daily["UCs interessadas no dia"].astype(int)
+    daily["Acumulado"] = daily["UCs interessadas no dia"].cumsum()
     return daily
-
 
 
 def cumulative_comms(df):
@@ -319,7 +284,6 @@ def cumulative_comms(df):
     return daily
 
 
-
 def make_municipio_map(df_municipio):
     valid = df_municipio.dropna(subset=["lat", "lon"]).copy()
     if valid.empty:
@@ -332,7 +296,7 @@ def make_municipio_map(df_municipio):
         popup = folium.Popup(
             f"""
             <b>{row['MUNICIPIO']}</b><br>
-            Interesses: {int(row['interesses'])}<br>
+            UCs interessadas: {int(row['interesses'])}<br>
             UCs únicas: {int(row['ucs'])}<br>
             Plano líder: {row['plano_top']}
             """,
@@ -356,15 +320,11 @@ if "map_selected_municipio" not in st.session_state:
 st.title("BI de Comunicação — Plano Fixo")
 st.caption("Filtros por município, plano, prazo, informe, bandeira, rural, template/ação e gráficos acumulados.")
 
-uploaded_interessados, uploaded_email, uploaded_im = build_sidebar_uploaders()
-
 try:
-    interessados, email, im, comunicacoes = load_data(uploaded_interessados, uploaded_email, uploaded_im)
+    interessados, email, im, comunicacoes = load_data()
 except FileNotFoundError as e:
     st.error(str(e))
-    st.info(
-        "Coloque os arquivos .parquet no repositório (raiz ou pasta data/) ou envie os três arquivos pela sidebar."
-    )
+    st.info("Coloque os arquivos .parquet no repositório, na mesma pasta do app, ou em uma pasta data/.")
     st.stop()
 except Exception as e:
     st.error(f"Erro ao carregar os arquivos parquet: {e}")
@@ -388,8 +348,8 @@ with st.sidebar:
     bandeiras = st.multiselect("Com bandeira", ["Sim", "Não"])
     rural_sel = st.multiselect("Rural", ["Sim", "Não"])
     planos = st.multiselect("Plano detalhado", sorted([v for v in PLAN_ID_MAP.values()]))
-    status_values = sorted([s for s in interessados.get("IND_SITUACAO", pd.Series(dtype=str)).dropna().unique().tolist()])
-    status_sel = st.multiselect("Status em df_interessados", status_values)
+    available_status = [s for s in VALID_INTEREST_STATUS if s in interessados.get("IND_SITUACAO", pd.Series(dtype=str)).dropna().unique().tolist()]
+    status_sel = st.multiselect("Status considerados como interesse", available_status, default=available_status)
     canais = st.multiselect("Canal de comunicação", ["E-mail", "IM"])
     comm_options = sorted(comunicacoes["comunicacao"].dropna().unique().tolist())
     comunicacoes_sel = st.multiselect("Template / Ação", comm_options)
@@ -411,6 +371,8 @@ with st.sidebar:
 filtered_interessados = filter_interessados(
     interessados, municipios, prazos, informes, bandeiras, rural_sel, planos, status_sel, data_inicio, data_fim
 )
+filtered_interessados_interest = interest_base(filtered_interessados)
+
 filtered_comms = filter_comunicacoes(
     comunicacoes, municipios, prazos, informes, bandeiras, rural_sel, planos, canais, comunicacoes_sel, data_inicio, data_fim
 )
@@ -418,10 +380,12 @@ filtered_comms = filter_comunicacoes(
 map_base = filter_interessados(
     interessados, [], prazos, informes, bandeiras, rural_sel, planos, status_sel, data_inicio, data_fim
 )
+map_base = interest_base(map_base)
+
 municipio_summary = (
-    map_base.dropna(subset=["MUNICIPIO"])
+    map_base.dropna(subset=["MUNICIPIO", "NUM_UC"])
     .groupby("MUNICIPIO", as_index=False)
-    .agg(interesses=("NUM_UC", "size"), ucs=("NUM_UC", "nunique"), lat=("lat", "median"), lon=("lon", "median"))
+    .agg(interesses=("NUM_UC", "nunique"), ucs=("NUM_UC", "nunique"), lat=("lat", "median"), lon=("lon", "median"))
 )
 if not municipio_summary.empty:
     top_plans = (
@@ -451,8 +415,8 @@ with col_map:
 
 with col_kpi:
     st.subheader("Resumo")
-    total_interesses = len(filtered_interessados)
-    ucs_interesses = filtered_interessados["NUM_UC"].nunique() if "NUM_UC" in filtered_interessados.columns else 0
+    total_interesses = unique_interest_ucs(filtered_interessados_interest)
+    ucs_interesses = unique_interest_ucs(filtered_interessados_interest)
     total_comms = len(filtered_comms)
     ucs_comms = filtered_comms["uc_join"].nunique() if "uc_join" in filtered_comms.columns else 0
     covered_rate = (filtered_comms["tem_dimensao_uc"].mean() * 100) if len(filtered_comms) and "tem_dimensao_uc" in filtered_comms.columns else 0
@@ -463,17 +427,17 @@ with col_kpi:
     k3.metric("Comunicações filtradas", f"{total_comms:,}".replace(",", "."))
     k4.metric("UCs com comunicação", f"{ucs_comms:,}".replace(",", "."))
     st.metric("% comunicações ligadas a UC com dimensão", f"{covered_rate:.1f}%")
-    if not filtered_interessados.empty and "prazo_plano" in filtered_interessados.columns:
+    if not filtered_interessados_interest.empty and "prazo_plano" in filtered_interessados_interest.columns:
         st.write("**Mix de prazo**")
-        prazo_mix = filtered_interessados["prazo_plano"].value_counts(dropna=False)
+        prazo_mix = filtered_interessados_interest["prazo_plano"].value_counts(dropna=False)
         st.dataframe(prazo_mix.rename_axis("Prazo").reset_index(name="Qtd"), width="stretch", hide_index=True)
 
 row1_col1, row1_col2 = st.columns(2)
 with row1_col1:
-    st.subheader("Acumulado de interesses")
-    cum_int = cumulative_interest(filtered_interessados)
+    st.subheader("Acumulado de UCs interessadas")
+    cum_int = cumulative_interest(filtered_interessados_interest)
     if not cum_int.empty:
-        fig = px.line(cum_int, x="Data", y="Acumulado", markers=True, hover_data=["Interesses do dia"])
+        fig = px.line(cum_int, x="Data", y="Acumulado", markers=True, hover_data=["UCs interessadas no dia"])
         fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), yaxis_title="Acumulado")
         st.plotly_chart(fig, width="stretch")
     else:
@@ -490,8 +454,14 @@ with row1_col2:
 
 row2_col1, row2_col2 = st.columns(2)
 with row2_col1:
-    st.subheader("Interesses por plano")
-    plano_counts = filtered_interessados.get("plano_nome", pd.Series(dtype=str)).fillna("Sem classificação").value_counts().rename_axis("Plano").reset_index(name="Qtd")
+    st.subheader("UCs interessadas por plano")
+    plano_counts = (
+        filtered_interessados_interest.get("plano_nome", pd.Series(dtype=str))
+        .fillna("Sem classificação")
+        .value_counts()
+        .rename_axis("Plano")
+        .reset_index(name="Qtd")
+    )
     if not plano_counts.empty:
         fig = px.bar(plano_counts, x="Plano", y="Qtd")
         fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), xaxis_title=None)
@@ -510,8 +480,15 @@ with row2_col2:
 
 row3_col1, row3_col2 = st.columns(2)
 with row3_col1:
-    st.subheader("Interesses por município")
-    muni_counts = filtered_interessados.get("MUNICIPIO", pd.Series(dtype=str)).fillna("Sem município").value_counts().head(20).rename_axis("Município").reset_index(name="Qtd")
+    st.subheader("UCs interessadas por município")
+    muni_counts = (
+        filtered_interessados_interest.get("MUNICIPIO", pd.Series(dtype=str))
+        .fillna("Sem município")
+        .value_counts()
+        .head(20)
+        .rename_axis("Município")
+        .reset_index(name="Qtd")
+    )
     if not muni_counts.empty:
         fig = px.bar(muni_counts, x="Município", y="Qtd")
         fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), xaxis_title=None)
@@ -529,19 +506,19 @@ with row3_col2:
         st.info("Sem dados para os filtros atuais.")
 
 st.subheader("Tabelas detalhadas")
-tab1, tab2 = st.tabs(["Interesses", "Comunicações"])
+tab1, tab2 = st.tabs(["UCs interessadas", "Comunicações"])
 with tab1:
     cols = [
         "NUM_UC", "IND_SITUACAO", "DTH_INTERESSE", "MUNICIPIO", "plano_nome", "prazo_plano",
         "informe", "com_bandeira", "rural", "CTTs_ANTES_ACEITE_TOTAL", "DIAS_ACEITE_MAX", "ULT_CTT_ANTES_ACEITE"
     ]
-    cols = [c for c in cols if c in filtered_interessados.columns]
-    export_int = filtered_interessados[cols].copy()
+    cols = [c for c in cols if c in filtered_interessados_interest.columns]
+    export_int = filtered_interessados_interest[cols].copy()
     st.dataframe(export_int, width="stretch", hide_index=True)
     st.download_button(
-        "Baixar interesses filtrados (CSV)",
+        "Baixar UCs interessadas filtradas (CSV)",
         export_int.to_csv(index=False).encode("utf-8-sig"),
-        file_name="interesses_filtrados.csv",
+        file_name="ucs_interessadas_filtradas.csv",
         mime="text/csv",
     )
 with tab2:
