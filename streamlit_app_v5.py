@@ -402,21 +402,48 @@ def build_map(df: pd.DataFrame):
     st.plotly_chart(fig, width="stretch")
 
 
-def plot_cumulative_interested(df: pd.DataFrame):
-    daily = (
-        df.dropna(subset=["DTH_INTERESSE"])
-        .assign(Data=lambda x: x["DTH_INTERESSE"].dt.floor("D"))
-        .groupby("Data", as_index=False)["NUM_UC"]
-        .nunique()
-        .rename(columns={"NUM_UC": "UCs interessadas"})
-        .sort_values("Data")
-    )
-    if daily.empty:
+def plot_cumulative_interested_by_plan(df: pd.DataFrame):
+    base = df[df["IND_SITUACAO"].isin(INTEREST_STATUSES)].copy()
+    base = base.dropna(subset=["DTH_INTERESSE", "PLANO_DETALHADO", "PRAZO_PLANO"])
+
+    if base.empty:
         st.info("Sem dados de UCs interessadas no período.")
         return
-    daily["Acumulado"] = daily["UCs interessadas"].cumsum()
-    fig = px.line(daily, x="Data", y="Acumulado")
-    fig.update_layout(margin=dict(l=0, r=0, t=20, b=0), yaxis_title="UCs interessadas acumuladas", xaxis_title="")
+
+    daily = (
+        base.assign(Data=base["DTH_INTERESSE"].dt.floor("D"))
+        .groupby(["Data", "PLANO_DETALHADO", "PRAZO_PLANO"], as_index=False)["NUM_UC"]
+        .nunique()
+        .rename(columns={"NUM_UC": "UCs interessadas"})
+        .sort_values(["PLANO_DETALHADO", "Data"])
+    )
+
+    daily["Acumulado"] = daily.groupby("PLANO_DETALHADO")["UCs interessadas"].cumsum()
+
+    symbol_map = {
+        "Trimestral": "triangle-up",
+        "Semestral": "square",
+        "Anual": "circle",
+    }
+
+    fig = px.line(
+        daily,
+        x="Data",
+        y="Acumulado",
+        color="PLANO_DETALHADO",
+        symbol="PRAZO_PLANO",
+        symbol_map=symbol_map,
+        markers=True,
+    )
+
+    fig.update_traces(marker=dict(size=9))
+    fig.update_layout(
+        margin=dict(l=0, r=0, t=20, b=0),
+        yaxis_title="UCs interessadas acumuladas",
+        xaxis_title="",
+        legend_title="Plano",
+    )
+
     st.plotly_chart(fig, width="stretch")
 
 
