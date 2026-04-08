@@ -1,4 +1,3 @@
-
 import re
 from pathlib import Path
 
@@ -6,6 +5,11 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+
+try:
+    from streamlit_dynamic_filters import DynamicFilters
+except ImportError:  # pragma: no cover - handled at runtime in Streamlit
+    DynamicFilters = None
 
 st.set_page_config(page_title="BI Comunicação Plano Fixo", page_icon="📊", layout="wide")
 
@@ -18,6 +22,8 @@ DATA_SEARCH_DIRS = [
 ]
 
 INTEREST_STATUSES = {"A", "I", "R", "D", "X"}
+NO_COMM_LABEL = "Sem comunicação no período"
+FILTERS_NAME = "bi_comunicacao_filters"
 
 PLAN_ID_MAP = {
     1: "Trimestral com informe Mensal",
@@ -123,6 +129,19 @@ IM_TEMPLATE_TO_GROUP = {}
 for group_name, template_set in CHANNEL_TEMPLATE_GROUPS.items():
     for template in template_set:
         IM_TEMPLATE_TO_GROUP[template] = group_name
+
+
+FILTER_DISPLAY_COLUMNS = {
+    "MUNICIPIO": "Município",
+    "PLANO_DETALHADO": "Planos",
+    "PRAZO_PLANO": "Acerto",
+    "INFORME": "Informe",
+    "BANDEIRA": "Bandeira",
+    "RURAL": "Rural",
+    "Canal": "Canal de comunicação",
+    "Template_Acao_Grupo": "Template / Ação",
+}
+FILTER_COLUMNS = list(FILTER_DISPLAY_COLUMNS.values())
 
 
 def find_parquet(filename: str) -> Path:
@@ -245,6 +264,56 @@ def load_data():
     return interessados, comunicacoes
 
 
+def clear_dynamic_filters(filters_name: str = FILTERS_NAME):
+    for key in list(st.session_state.keys()):
+        if filters_name in key:
+            st.session_state.pop(key)
+
+
+def build_shared_filter_base(interessados_date: pd.DataFrame, comunicacoes_date: pd.DataFrame) -> pd.DataFrame:
+    dim_cols = [
+        "NUM_UC",
+        "MUNICIPIO",
+        "PLANO_DETALHADO",
+        "PRAZO_PLANO",
+        "INFORME",
+        "BANDEIRA",
+        "RURAL",
+    ]
+
+    interested_dims = interessados_date[dim_cols].dropna(subset=["NUM_UC"]).drop_duplicates(subset=["NUM_UC"])
+    comm_dims = comunicacoes_date[dim_cols].dropna(subset=["NUM_UC"]).drop_duplicates(subset=["NUM_UC"])
+
+    uc_dims = (
+        pd.concat([interested_dims.assign(_priority=0), comm_dims.assign(_priority=1)], ignore_index=True)
+        .sort_values(["NUM_UC", "_priority"])
+        .drop_duplicates(subset=["NUM_UC"], keep="first")
+        .drop(columns="_priority")
+    )
+
+    com_base = comunicacoes_date[
+        ["_COMM_ROW_ID", "NUM_UC", "Canal", "Template_Acao_Grupo"]
+    ].copy()
+    com_base = com_base.merge(uc_dims, on="NUM_UC", how="left")
+    com_base["_ROW_KIND"] = "comunicacao"
+
+    no_comm_ucs = interested_dims.loc[
+        ~interested_dims["NUM_UC"].isin(comunicacoes_date["NUM_UC"].dropna().unique())
+    ].copy()
+    no_comm_ucs["_COMM_ROW_ID"] = pd.NA
+    no_comm_ucs["Canal"] = NO_COMM_LABEL
+    no_comm_ucs["Template_Acao_Grupo"] = NO_COMM_LABEL
+    no_comm_ucs["_ROW_KIND"] = "sem_comunicacao"
+
+    shared = pd.concat([com_base, no_comm_ucs], ignore_index=True, sort=False)
+
+    for source_col, display_col in FILTER_DISPLAY_COLUMNS.items():
+        fill_value = NO_COMM_LABEL if source_col in {"Canal", "Template_Acao_Grupo"} else "Não informado"
+        shared[display_col] = shared[source_col].fillna(fill_value).astype(str).str.strip()
+
+    return shared
+
+
 def apply_filters(interessados: pd.DataFrame, comunicacoes: pd.DataFrame):
     st.sidebar.header("Filtros")
 
@@ -260,80 +329,55 @@ def apply_filters(interessados: pd.DataFrame, comunicacoes: pd.DataFrame):
         min_value=min_date.date(),
         max_value=max_date.date(),
     )
-    
-    municipios = sorted(x for x in interessados["MUNICIPIO"].dropna().unique().tolist() if x)
-    municipio = st.sidebar.selectbox("Município", ["Todos"] + municipios, index=0)
 
-    planos = sorted(x for x in interessados["PLANO_DETALHADO"].dropna().unique().tolist() if x)
-    plano_sel = st.sidebar.multiselect("Planos", planos, default=planos)
-    
-    acerto = sorted(x for x in interessados["PRAZO_PLANO"].dropna().unique().tolist() if x)
-    prazo_sel = st.sidebar.multiselect("Acerto", acerto, default=acerto)
-
-    informes = sorted(x for x in interessados["INFORME"].dropna().unique().tolist() if x)
-    informe_sel = st.sidebar.multiselect("Informe", informes, default=informes)
-
-    bandeiras = sorted(x for x in interessados["BANDEIRA"].dropna().unique().tolist() if x)
-    bandeira_sel = st.sidebar.multiselect("Bandeira", bandeiras, default=bandeiras)
-
-    rural_vals = sorted(x for x in interessados["RURAL"].dropna().unique().tolist() if x)
-    rural_sel = st.sidebar.multiselect("Rural", rural_vals, default=rural_vals)    
-
-    canais = ["WhatsApp", "SMS", "Push", "Email"]
-    canal_sel = st.sidebar.multiselect("Canal de comunicação", canais, default=canais)
-
-    email_group_order = [
-        "EMAIL Outubro",
-        "EMAIL Novembro",
-        "EMAIL Dezembro",
-        "EMAIL Lançamento",
-        "EMAIL Reforço",
-    ]
-    channel_group_order = ["Gisaconect", "WhatsApp", "SMS", "Push"]
-
-    template_options = [x for x in email_group_order if x in comunicacoes["Template_Acao_Grupo"].unique()]
-    template_options += [x for x in channel_group_order if x in comunicacoes["Template_Acao_Grupo"].unique()]
-
-    leftovers = sorted(
-        x for x in comunicacoes["Template_Acao_Grupo"].dropna().unique().tolist()
-        if x not in template_options and x
-    )
-    template_options.extend(leftovers)
-
-    template_sel = st.sidebar.multiselect("Template / Ação", template_options, default=template_options)
-    
     if isinstance(date_range, tuple) and len(date_range) == 2:
         dt_ini = pd.Timestamp(date_range[0])
         dt_fim = pd.Timestamp(date_range[1]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
     else:
         dt_ini, dt_fim = min_date, max_date
 
-    f_int = interessados.copy()
-    f_com = comunicacoes.copy()
+    interessados_date = interessados[
+        (interessados["DTH_INTERESSE"] >= dt_ini) & (interessados["DTH_INTERESSE"] <= dt_fim)
+    ].copy()
 
-    if municipio != "Todos":
-        f_int = f_int[f_int["MUNICIPIO"] == municipio]
-        f_com = f_com[f_com["MUNICIPIO"] == municipio]
+    comunicacoes_date = comunicacoes[
+        (comunicacoes["Data"] >= dt_ini) & (comunicacoes["Data"] <= dt_fim)
+    ].copy()
+    comunicacoes_date["_COMM_ROW_ID"] = np.arange(len(comunicacoes_date), dtype=int)
 
-    f_int = f_int[
-        f_int["PRAZO_PLANO"].isin(prazo_sel)
-        & f_int["INFORME"].isin(informe_sel)
-        & f_int["BANDEIRA"].isin(bandeira_sel)
-        & f_int["RURAL"].isin(rural_sel)
-        & f_int["PLANO_DETALHADO"].isin(plano_sel)
-    ]
-    f_int = f_int[(f_int["DTH_INTERESSE"] >= dt_ini) & (f_int["DTH_INTERESSE"] <= dt_fim)]
+    if DynamicFilters is None:
+        st.sidebar.error(
+            "Pacote streamlit-dynamic-filters não encontrado. Instale com: pip install streamlit-dynamic-filters"
+        )
+        return interessados_date, comunicacoes_date
 
-    f_com = f_com[
-        f_com["Canal"].isin(canal_sel)
-        & f_com["PRAZO_PLANO"].isin(prazo_sel)
-        & f_com["INFORME"].isin(informe_sel)
-        & f_com["BANDEIRA"].isin(bandeira_sel)
-        & f_com["RURAL"].isin(rural_sel)
-        & f_com["PLANO_DETALHADO"].isin(plano_sel)
-        & f_com["Template_Acao_Grupo"].isin(template_sel)
-    ]
-    f_com = f_com[(f_com["Data"] >= dt_ini) & (f_com["Data"] <= dt_fim)]
+    shared_filter_base = build_shared_filter_base(interessados_date, comunicacoes_date)
+
+    with st.sidebar:
+        st.button("Limpar filtros", on_click=clear_dynamic_filters)
+
+    if shared_filter_base.empty:
+        return interessados_date.iloc[0:0].copy(), comunicacoes_date.iloc[0:0].copy()
+
+    dynamic_filters = DynamicFilters(
+        shared_filter_base,
+        filters=FILTER_COLUMNS,
+        filters_name=FILTERS_NAME,
+    )
+    dynamic_filters.display_filters(location="sidebar")
+    filtered_base = dynamic_filters.filter_df().copy()
+
+    selected_ucs = filtered_base["NUM_UC"].dropna().unique()
+    f_int = interessados_date[interessados_date["NUM_UC"].isin(selected_ucs)].copy()
+
+    selected_comm_ids = (
+        filtered_base.loc[filtered_base["_ROW_KIND"] == "comunicacao", "_COMM_ROW_ID"]
+        .dropna()
+        .astype(int)
+        .unique()
+    )
+    f_com = comunicacoes_date[comunicacoes_date["_COMM_ROW_ID"].isin(selected_comm_ids)].copy()
+    f_com = f_com.drop(columns=["_COMM_ROW_ID"], errors="ignore")
 
     return f_int, f_com
 
@@ -389,7 +433,7 @@ def build_map(df: pd.DataFrame):
     fig.update_traces(
         textposition="top center",
         textfont=dict(color="black", size=11),
-        marker=dict(opacity=0.8)
+        marker=dict(opacity=0.8),
     )
     fig.update_layout(
         mapbox_style="carto-positron",
@@ -412,45 +456,28 @@ def plot_cumulative_interested_by_plan(df: pd.DataFrame):
 
     base["Data"] = base["DTH_INTERESSE"].dt.floor("D")
 
-    # Daily unique UCs by plan
     daily = (
         base.groupby(["Data", "PLANO_DETALHADO", "PRAZO_PLANO"], as_index=False)["NUM_UC"]
         .nunique()
         .rename(columns={"NUM_UC": "UCs interessadas"})
     )
 
-    # Complete date range from first to last date in filtered data
-    all_dates = pd.date_range(
-        start=base["Data"].min(),
-        end=base["Data"].max(),
-        freq="D"
-    )
-
-    # One row per plan
+    all_dates = pd.date_range(start=base["Data"].min(), end=base["Data"].max(), freq="D")
     plans = daily[["PLANO_DETALHADO", "PRAZO_PLANO"]].drop_duplicates()
 
-    # Cartesian product: every date x every plan
     full_index = (
         plans.assign(_key=1)
         .merge(pd.DataFrame({"Data": all_dates, "_key": 1}), on="_key")
         .drop(columns="_key")
     )
 
-    # Merge actual counts; missing days become zero
     full_daily = (
-        full_index.merge(
-            daily,
-            on=["Data", "PLANO_DETALHADO", "PRAZO_PLANO"],
-            how="left"
-        )
+        full_index.merge(daily, on=["Data", "PLANO_DETALHADO", "PRAZO_PLANO"], how="left")
         .fillna({"UCs interessadas": 0})
         .sort_values(["PLANO_DETALHADO", "Data"])
     )
 
-    # Continuous cumulative line for every plan
-    full_daily["Acumulado"] = (
-        full_daily.groupby("PLANO_DETALHADO")["UCs interessadas"].cumsum()
-    )
+    full_daily["Acumulado"] = full_daily.groupby("PLANO_DETALHADO")["UCs interessadas"].cumsum()
 
     symbol_map = {
         "Trimestral": "triangle-up",
@@ -515,10 +542,7 @@ def main():
     interessados, comunicacoes = load_data()
 
     total_ucs_interessadas = interessados["NUM_UC"].dropna().nunique()
-
-    # ===== TOTAL (SEM FILTRO) =====
     total_contacted_ucs = comunicacoes["NUM_UC"].dropna().nunique()
-    total_messages = comunicacoes["Mensagens"].sum()
     total_messages_by_channel = (
         comunicacoes.groupby("Canal", as_index=False)["Mensagens"]
         .sum()
@@ -533,31 +557,32 @@ def main():
         .dropna()
         .nunique()
     )
-       
-    total_pct_contacted_that_interested = (
-        100 * total_interested_with_contact / total_contacted_ucs if total_contacted_ucs else 0
+    total_interested_without_contact = (
+        interessados[
+            (~interessados["TEM_COMUNICACAO"].fillna(False))
+            & interessados["IND_SITUACAO"].isin(INTEREST_STATUSES)
+        ]["NUM_UC"]
+        .dropna()
+        .nunique()
     )
 
     st.title("BI Comunicação Plano Fixo")
 
     f_int, f_com = apply_filters(interessados, comunicacoes)
 
-    interested_filtered = (
-        f_int[f_int["IND_SITUACAO"].isin(INTEREST_STATUSES)]["NUM_UC"].dropna().nunique()
-    )
+    interested_filtered = f_int[f_int["IND_SITUACAO"].isin(INTEREST_STATUSES)]["NUM_UC"].dropna().nunique()
     interested_with_contact_filtered = (
         f_int[f_int["TEM_COMUNICACAO"] & f_int["IND_SITUACAO"].isin(INTEREST_STATUSES)]["NUM_UC"]
         .dropna()
         .nunique()
     )
-    pct_of_total_interested = (
-        100 * interested_with_contact_filtered / total_ucs_interessadas if total_ucs_interessadas else 0
-    )
-
     interested_without_contact_filtered = (
         f_int[(~f_int["TEM_COMUNICACAO"].fillna(False)) & f_int["IND_SITUACAO"].isin(INTEREST_STATUSES)]["NUM_UC"]
         .dropna()
         .nunique()
+    )
+    pct_of_total_interested = (
+        100 * interested_with_contact_filtered / total_ucs_interessadas if total_ucs_interessadas else 0
     )
     pct_of_total_interested_without = (
         100 * interested_without_contact_filtered / total_ucs_interessadas if total_ucs_interessadas else 0
@@ -577,7 +602,7 @@ def main():
             ("UCs contactadas", format_int(total_contacted_ucs), "Total de UCs que receberam algum contato, sem aplicar filtros."),
             ("Total de UCs interessadas", format_int(total_ucs_interessadas), "Total de UCs que demonstraram interesse."),
             ("UCs interessadas com contato", format_int(total_interested_with_contact), "UCs com pelo menos uma comunicação anterior ao interesse, sem aplicar filtros."),
-            ("UCs interessadas com contato", format_int(total_interested_with_contact), "UCs com pelo menos uma comunicação anterior ao interesse, sem aplicar filtros."),
+            ("UCs interessadas sem contato", format_int(total_interested_without_contact), "UCs sem comunicação anterior ao interesse, sem aplicar filtros."),
             ("Mensagens por Email", format_int(total_messages_by_channel.get("Email", 0)), "Total de mensagens de Email, sem aplicar filtros."),
             ("Mensagens por WhatsApp", format_int(total_messages_by_channel.get("WhatsApp", 0)), "Total de mensagens de WhatsApp, sem aplicar filtros."),
             ("Mensagens por SMS", format_int(total_messages_by_channel.get("SMS", 0)), "Total de mensagens de SMS, sem aplicar filtros."),
@@ -589,11 +614,11 @@ def main():
     render_metric_block(
         "Filtrado",
         [
-            ("UCs interessadas no filtro", format_int(interested_filtered), "UCs Interessadas dentro dos filtros atuais."),
-            ("UCs interessadas com contato", format_int(interested_with_contact_filtered), "UCs interessadas com pelo menos uma comunicação anterior a data de interesse dentro dos filtros."),
-            ("% do total de UCs interessadas", format_pct(pct_of_total_interested), "Percentual das UCs interessadas com contato sobre o total."), 
-            ("UCs interessadas sem contato", format_int(interested_without_contact_filtered), "UCs interessadas sem nenhuma comunicação anterior a data de interesse dentro dos filtros."),
-            ("% do total de UCs interessadas", format_pct(pct_of_total_interested_without), "Percentual das UCs interessadas sem contato sobre o total."), 
+            ("UCs interessadas no filtro", format_int(interested_filtered), "UCs interessadas dentro dos filtros atuais."),
+            ("UCs interessadas com contato", format_int(interested_with_contact_filtered), "UCs interessadas com pelo menos uma comunicação anterior à data de interesse dentro dos filtros."),
+            ("% do total de UCs interessadas", format_pct(pct_of_total_interested), "Percentual das UCs interessadas com contato sobre o total."),
+            ("UCs interessadas sem contato", format_int(interested_without_contact_filtered), "UCs interessadas sem nenhuma comunicação anterior à data de interesse dentro dos filtros."),
+            ("% do total de UCs interessadas sem contato", format_pct(pct_of_total_interested_without), "Percentual das UCs interessadas sem contato sobre o total."),
             ("Mensagens filtradas", format_int(filtered_messages), "Total de mensagens após os filtros."),
             ("Mensagens por Email", format_int(filtered_messages_by_channel.get("Email", 0)), "Mensagens de Email após os filtros."),
             ("Mensagens por WhatsApp", format_int(filtered_messages_by_channel.get("WhatsApp", 0)), "Mensagens de WhatsApp após os filtros."),
@@ -606,10 +631,10 @@ def main():
     build_map(f_int)
     st.subheader("Linha do tempo de Interesse")
     plot_cumulative_interested_by_plan(f_int)
-    
+
     st.subheader("Mensagens acumuladas")
     plot_cumulative_messages(f_com[f_com["Canal"].isin(["Email", "WhatsApp", "SMS", "Push"])])
-    
+
     col3, col4 = st.columns(2)
     with col3:
         plot_bar(f_int[f_int["IND_SITUACAO"].isin(INTEREST_STATUSES)], "PLANO_DETALHADO", "UCs interessadas por plano")
@@ -619,9 +644,7 @@ def main():
     comm_col1, comm_col2 = st.columns(2)
     with comm_col1:
         if not f_com.empty:
-            by_canal = (
-                f_com.groupby("Canal", as_index=False)["Mensagens"].sum().sort_values("Mensagens", ascending=False)
-            )
+            by_canal = f_com.groupby("Canal", as_index=False)["Mensagens"].sum().sort_values("Mensagens", ascending=False)
             fig = px.bar(by_canal, x="Canal", y="Mensagens")
             fig.update_layout(title="Mensagens por canal", margin=dict(l=0, r=0, t=40, b=0), xaxis_title="")
             st.plotly_chart(fig, width="stretch")
@@ -649,7 +672,7 @@ def main():
         st.dataframe(
             f_int[show_cols].sort_values(["MUNICIPIO", "NUM_UC"], ascending=[True, True]),
             width="stretch",
-            height=350
+            height=350,
         )
 
     with st.expander("Tabela de comunicações filtradas"):
@@ -660,7 +683,7 @@ def main():
         st.dataframe(
             f_com[show_cols].sort_values(["Data", "NUM_UC"], ascending=[False, True]),
             width="stretch",
-            height=350
+            height=350,
         )
 
 
