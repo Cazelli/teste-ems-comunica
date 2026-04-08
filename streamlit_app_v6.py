@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-
+import base64
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -601,7 +601,7 @@ def main():
         .dropna()
         .nunique()
     )
-
+    render_top_banner(str(APP_DIR / "image.png"))
     st.title("BI Comunicação Fatura Fixa")
 
     f_int, f_com = apply_filters(interessados, comunicacoes)
