@@ -533,7 +533,7 @@ def main():
         .dropna()
         .nunique()
     )
-
+       
     total_pct_contacted_that_interested = (
         100 * total_interested_with_contact / total_contacted_ucs if total_contacted_ucs else 0
     )
@@ -554,9 +554,13 @@ def main():
         100 * interested_with_contact_filtered / total_ucs_interessadas if total_ucs_interessadas else 0
     )
 
-    contacted_ucs_filtered = f_com["NUM_UC"].dropna().nunique()
-    pct_contacted_that_interested = (
-        100 * interested_with_contact_filtered / contacted_ucs_filtered if contacted_ucs_filtered else 0
+    interested_without_contact_filtered = (
+        f_int[(~f_int["TEM_COMUNICACAO"].fillna(False)) & f_int["IND_SITUACAO"].isin(INTEREST_STATUSES)]["NUM_UC"]
+        .dropna()
+        .nunique()
+    )
+    pct_of_total_interested_without = (
+        100 * interested_without_contact_filtered / total_ucs_interessadas if total_ucs_interessadas else 0
     )
 
     filtered_messages = f_com["Mensagens"].sum()
@@ -573,7 +577,7 @@ def main():
             ("UCs contactadas", format_int(total_contacted_ucs), "Total de UCs que receberam algum contato, sem aplicar filtros."),
             ("Total de UCs interessadas", format_int(total_ucs_interessadas), "Total de UCs que demonstraram interesse."),
             ("UCs interessadas com contato", format_int(total_interested_with_contact), "UCs com pelo menos uma comunicação anterior ao interesse, sem aplicar filtros."),
-            ("% das UCs contactadas que demonstraram interesse", format_pct(total_pct_contacted_that_interested), "UCs interessadas com contato dividido pelo total de UCs contactadas, sem aplicar filtros."),
+            ("UCs interessadas com contato", format_int(total_interested_with_contact), "UCs com pelo menos uma comunicação anterior ao interesse, sem aplicar filtros."),
             ("Mensagens por Email", format_int(total_messages_by_channel.get("Email", 0)), "Total de mensagens de Email, sem aplicar filtros."),
             ("Mensagens por WhatsApp", format_int(total_messages_by_channel.get("WhatsApp", 0)), "Total de mensagens de WhatsApp, sem aplicar filtros."),
             ("Mensagens por SMS", format_int(total_messages_by_channel.get("SMS", 0)), "Total de mensagens de SMS, sem aplicar filtros."),
@@ -585,11 +589,11 @@ def main():
     render_metric_block(
         "Filtrado",
         [
-            ("UCs interessadas no filtro", format_int(interested_filtered), "UCs únicas do df_interessados dentro dos filtros atuais."),
-            ("UCs interessadas com contato", format_int(interested_with_contact_filtered), "UCs interessadas com pelo menos uma comunicação anterior dentro dos filtros."),
-            ("% do total de UCs interessadas", format_pct(pct_of_total_interested), "Percentual das UCs interessadas com contato sobre o total de UCs únicas do df_interessados."),
-            ("UCs contactadas", format_int(contacted_ucs_filtered), "UCs únicas presentes nos arquivos IM + Email após os filtros."),
-            ("% das UCs contactadas que demonstraram interesse", format_pct(pct_contacted_that_interested), "UCs interessadas com contato dividido pelas UCs contactadas dos arquivos IM + Email no filtro."),
+            ("UCs interessadas no filtro", format_int(interested_filtered), "UCs Interessadas dentro dos filtros atuais."),
+            ("UCs interessadas com contato", format_int(interested_with_contact_filtered), "UCs interessadas com pelo menos uma comunicação anterior a data de interesse dentro dos filtros."),
+            ("% do total de UCs interessadas", format_pct(pct_of_total_interested), "Percentual das UCs interessadas com contato sobre o total."), 
+            ("UCs interessadas sem contato", format_int(interested_without_contact_filtered), "UCs interessadas sem nenhuma comunicação anterior a data de interesse dentro dos filtros."),
+            ("% do total de UCs interessadas", format_pct(pct_of_total_interested_without), "Percentual das UCs interessadas sem contato sobre o total."), 
             ("Mensagens filtradas", format_int(filtered_messages), "Total de mensagens após os filtros."),
             ("Mensagens por Email", format_int(filtered_messages_by_channel.get("Email", 0)), "Mensagens de Email após os filtros."),
             ("Mensagens por WhatsApp", format_int(filtered_messages_by_channel.get("WhatsApp", 0)), "Mensagens de WhatsApp após os filtros."),
