@@ -347,7 +347,7 @@ def format_int(value) -> str:
 
 
 def format_pct(value: float) -> str:
-    return f"{value:,.4f}%".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"{value:,.2f}%".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def render_metric_block(title: str, metrics: list[tuple[str, str, str]], n_cols: int = 7):
