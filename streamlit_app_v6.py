@@ -595,6 +595,7 @@ def main():
         .set_index("Canal")["Mensagens"]
         .to_dict()
     )
+    total_messages = comunicacoes["Mensagens"].sum()
 
     # First row: original summary cards
     render_metric_block(
