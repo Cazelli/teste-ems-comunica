@@ -11,7 +11,7 @@ try:
 except ImportError:  # pragma: no cover - handled at runtime in Streamlit
     DynamicFilters = None
 
-st.set_page_config(page_title="BI Comunicação Plano Fixo", page_icon="📊", layout="wide")
+st.set_page_config(page_title="BI Comunicação Fatura Fixa", page_icon="📊", layout="wide")
 
 APP_DIR = Path(__file__).parent.resolve()
 DATA_SEARCH_DIRS = [
