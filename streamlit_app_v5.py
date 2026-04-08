@@ -601,7 +601,7 @@ def main():
         .dropna()
         .nunique()
     )
-    render_top_banner(str(APP_DIR / "image.png"))
+    render_top_banner(str(APP_DIR / "banner.png"))
     st.title("BI Comunicação Fatura Fixa")
 
     f_int, f_com = apply_filters(interessados, comunicacoes)
