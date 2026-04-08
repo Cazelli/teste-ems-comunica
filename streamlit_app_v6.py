@@ -596,6 +596,7 @@ def main():
         .to_dict()
     )
 
+    # First row: original summary cards
     render_metric_block(
         "Total",
         [
@@ -603,12 +604,21 @@ def main():
             ("Total de UCs interessadas", format_int(total_ucs_interessadas), "Total de UCs que demonstraram interesse."),
             ("UCs interessadas com contato", format_int(total_interested_with_contact), "UCs com pelo menos uma comunicação anterior ao interesse, sem aplicar filtros."),
             ("UCs interessadas sem contato", format_int(total_interested_without_contact), "UCs sem comunicação anterior ao interesse, sem aplicar filtros."),
+        ],
+        n_cols=4,
+    )
+    
+    # Remaining total metrics: 5 columns
+    render_metric_block(
+        "",
+        [
+            ("Mensagens totais", format_int(total_messages), "Total de mensagens enviadas, sem aplicar filtros."),
             ("Mensagens por Email", format_int(total_messages_by_channel.get("Email", 0)), "Total de mensagens de Email, sem aplicar filtros."),
             ("Mensagens por WhatsApp", format_int(total_messages_by_channel.get("WhatsApp", 0)), "Total de mensagens de WhatsApp, sem aplicar filtros."),
             ("Mensagens por SMS", format_int(total_messages_by_channel.get("SMS", 0)), "Total de mensagens de SMS, sem aplicar filtros."),
             ("Mensagens por Push", format_int(total_messages_by_channel.get("Push", 0)), "Total de mensagens de Push, sem aplicar filtros."),
         ],
-        n_cols=4,
+        n_cols=5,
     )
 
     render_metric_block(
