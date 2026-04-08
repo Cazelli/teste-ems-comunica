@@ -507,19 +507,55 @@ def plot_cumulative_interested_by_plan(df: pd.DataFrame):
 
 
 def plot_cumulative_messages(df: pd.DataFrame):
-    daily = (
-        df.dropna(subset=["Data"])
-        .assign(Data=lambda x: x["Data"].dt.floor("D"))
-        .groupby(["Data", "Canal"], as_index=False)["Mensagens"]
-        .sum()
-        .sort_values("Data")
-    )
-    if daily.empty:
+    base = df.dropna(subset=["Data", "Canal"]).copy()
+
+    if base.empty:
         st.info("Sem comunicações no período.")
         return
-    daily["Acumulado"] = daily.groupby("Canal")["Mensagens"].cumsum()
-    fig = px.line(daily, x="Data", y="Acumulado", color="Canal")
-    fig.update_layout(margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Mensagens acumuladas", xaxis_title="")
+
+    base["Data"] = base["Data"].dt.floor("D")
+
+    # Daily messages by channel
+    daily = (
+        base.groupby(["Data", "Canal"], as_index=False)["Mensagens"]
+        .sum()
+    )
+
+    # Full date range from first to last date in the filtered data
+    all_dates = pd.date_range(
+        start=base["Data"].min(),
+        end=base["Data"].max(),
+        freq="D"
+    )
+
+    # One row per channel
+    canais = daily[["Canal"]].drop_duplicates()
+
+    # Cartesian product: every date x every channel
+    full_index = (
+        canais.assign(_key=1)
+        .merge(pd.DataFrame({"Data": all_dates, "_key": 1}), on="_key")
+        .drop(columns="_key")
+    )
+
+    # Fill missing days with zero messages
+    full_daily = (
+        full_index.merge(daily, on=["Data", "Canal"], how="left")
+        .fillna({"Mensagens": 0})
+        .sort_values(["Canal", "Data"])
+    )
+
+    # Continuous cumulative line for every channel
+    full_daily["Acumulado"] = (
+        full_daily.groupby("Canal")["Mensagens"].cumsum()
+    )
+
+    fig = px.line(full_daily, x="Data", y="Acumulado", color="Canal")
+    fig.update_layout(
+        margin=dict(l=0, r=0, t=20, b=0),
+        yaxis_title="Mensagens acumuladas",
+        xaxis_title=""
+    )
     st.plotly_chart(fig, width="stretch")
 
 
