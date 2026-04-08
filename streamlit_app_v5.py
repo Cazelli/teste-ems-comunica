@@ -264,8 +264,11 @@ def apply_filters(interessados: pd.DataFrame, comunicacoes: pd.DataFrame):
     municipios = sorted(x for x in interessados["MUNICIPIO"].dropna().unique().tolist() if x)
     municipio = st.sidebar.selectbox("Município", ["Todos"] + municipios, index=0)
 
-    prazos = sorted(x for x in interessados["PRAZO_PLANO"].dropna().unique().tolist() if x)
-    prazo_sel = st.sidebar.multiselect("Prazo do plano", prazos, default=prazos)
+    planos = sorted(x for x in interessados["PLANO_DETALHADO"].dropna().unique().tolist() if x)
+    plano_sel = st.sidebar.multiselect("Plano detalhado", planos, default=planos)
+    
+    acerto = sorted(x for x in interessados["PRAZO_PLANO"].dropna().unique().tolist() if x)
+    prazo_sel = st.sidebar.multiselect("Acerto", prazos, default=acerto)
 
     informes = sorted(x for x in interessados["INFORME"].dropna().unique().tolist() if x)
     informe_sel = st.sidebar.multiselect("Informe", informes, default=informes)
@@ -274,10 +277,7 @@ def apply_filters(interessados: pd.DataFrame, comunicacoes: pd.DataFrame):
     bandeira_sel = st.sidebar.multiselect("Bandeira", bandeiras, default=bandeiras)
 
     rural_vals = sorted(x for x in interessados["RURAL"].dropna().unique().tolist() if x)
-    rural_sel = st.sidebar.multiselect("Rural", rural_vals, default=rural_vals)
-
-    planos = sorted(x for x in interessados["PLANO_DETALHADO"].dropna().unique().tolist() if x)
-    plano_sel = st.sidebar.multiselect("Plano detalhado", planos, default=planos)
+    rural_sel = st.sidebar.multiselect("Rural", rural_vals, default=rural_vals)    
 
     canais = ["WhatsApp", "SMS", "Push", "Email"]
     canal_sel = st.sidebar.multiselect("Canal de comunicação", canais, default=canais)
