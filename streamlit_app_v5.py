@@ -143,6 +143,57 @@ FILTER_DISPLAY_COLUMNS = {
 }
 FILTER_COLUMNS = list(FILTER_DISPLAY_COLUMNS.values())
 
+def get_image_base64(image_path: str) -> str:
+    data = Path(image_path).read_bytes()
+    return base64.b64encode(data).decode()
+
+def render_top_banner(image_path: str):
+    img_b64 = get_image_base64(image_path)
+
+    st.markdown(
+        f"""
+        <style>
+        .top-banner-wrap {{
+            width: 100%;
+            background: #f3f3f3;
+            padding: 0;
+            margin: 0 0 1rem 0;
+            border: 1px solid #bdbdbd;
+            border-radius: 0;
+            overflow: hidden;
+        }}
+
+        .top-banner-inner {{
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #f3f3f3;
+        }}
+
+        .top-banner-inner img {{
+            width: 100%;
+            max-width: 1400px;
+            height: auto;
+            display: block;
+            object-fit: contain;
+        }}
+
+        /* Reduce top padding from Streamlit main area */
+        .block-container {{
+            padding-top: 1rem;
+        }}
+        </style>
+
+        <div class="top-banner-wrap">
+            <div class="top-banner-inner">
+                <img src="data:image/png;base64,{img_b64}" />
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 
 def find_parquet(filename: str) -> Path:
     for base in DATA_SEARCH_DIRS:
@@ -601,7 +652,7 @@ def main():
         .dropna()
         .nunique()
     )
-    render_top_banner("Header.png")
+    render_top_banner(str(APP_DIR / "image.png"))
     st.title("BI Comunicação Fatura Fixa")
 
     f_int, f_com = apply_filters(interessados, comunicacoes)
