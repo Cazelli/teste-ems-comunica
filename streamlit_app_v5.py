@@ -265,7 +265,7 @@ def apply_filters(interessados: pd.DataFrame, comunicacoes: pd.DataFrame):
     municipio = st.sidebar.selectbox("Município", ["Todos"] + municipios, index=0)
 
     planos = sorted(x for x in interessados["PLANO_DETALHADO"].dropna().unique().tolist() if x)
-    plano_sel = st.sidebar.multiselect("Plano detalhado", planos, default=planos)
+    plano_sel = st.sidebar.multiselect("Planos", planos, default=planos)
     
     acerto = sorted(x for x in interessados["PRAZO_PLANO"].dropna().unique().tolist() if x)
     prazo_sel = st.sidebar.multiselect("Acerto", acerto, default=acerto)
