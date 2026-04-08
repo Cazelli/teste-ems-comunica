@@ -268,7 +268,7 @@ def apply_filters(interessados: pd.DataFrame, comunicacoes: pd.DataFrame):
     plano_sel = st.sidebar.multiselect("Plano detalhado", planos, default=planos)
     
     acerto = sorted(x for x in interessados["PRAZO_PLANO"].dropna().unique().tolist() if x)
-    prazo_sel = st.sidebar.multiselect("Acerto", prazos, default=acerto)
+    prazo_sel = st.sidebar.multiselect("Acerto", acerto, default=acerto)
 
     informes = sorted(x for x in interessados["INFORME"].dropna().unique().tolist() if x)
     informe_sel = st.sidebar.multiselect("Informe", informes, default=informes)
