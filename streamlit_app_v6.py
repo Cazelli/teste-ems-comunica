@@ -566,7 +566,7 @@ def main():
         .nunique()
     )
 
-    st.title("BI Comunicação Plano Fixo")
+    st.title("BI Comunicação Fatura Fixa")
 
     f_int, f_com = apply_filters(interessados, comunicacoes)
 
