@@ -11,7 +11,7 @@ try:
 except ImportError:  # pragma: no cover - handled at runtime in Streamlit
     DynamicFilters = None
 
-st.set_page_config(page_title="BI Comunicação Plano Fixo", page_icon="📊", layout="wide")
+st.set_page_config(page_title="BI Comunicação Fatura Fixa", page_icon="📊", layout="wide")
 
 APP_DIR = Path(__file__).parent.resolve()
 DATA_SEARCH_DIRS = [
@@ -507,19 +507,55 @@ def plot_cumulative_interested_by_plan(df: pd.DataFrame):
 
 
 def plot_cumulative_messages(df: pd.DataFrame):
-    daily = (
-        df.dropna(subset=["Data"])
-        .assign(Data=lambda x: x["Data"].dt.floor("D"))
-        .groupby(["Data", "Canal"], as_index=False)["Mensagens"]
-        .sum()
-        .sort_values("Data")
-    )
-    if daily.empty:
+    base = df.dropna(subset=["Data", "Canal"]).copy()
+
+    if base.empty:
         st.info("Sem comunicações no período.")
         return
-    daily["Acumulado"] = daily.groupby("Canal")["Mensagens"].cumsum()
-    fig = px.line(daily, x="Data", y="Acumulado", color="Canal")
-    fig.update_layout(margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Mensagens acumuladas", xaxis_title="")
+
+    base["Data"] = base["Data"].dt.floor("D")
+
+    # Daily messages by channel
+    daily = (
+        base.groupby(["Data", "Canal"], as_index=False)["Mensagens"]
+        .sum()
+    )
+
+    # Full date range from first to last date in the filtered data
+    all_dates = pd.date_range(
+        start=base["Data"].min(),
+        end=base["Data"].max(),
+        freq="D"
+    )
+
+    # One row per channel
+    canais = daily[["Canal"]].drop_duplicates()
+
+    # Cartesian product: every date x every channel
+    full_index = (
+        canais.assign(_key=1)
+        .merge(pd.DataFrame({"Data": all_dates, "_key": 1}), on="_key")
+        .drop(columns="_key")
+    )
+
+    # Fill missing days with zero messages
+    full_daily = (
+        full_index.merge(daily, on=["Data", "Canal"], how="left")
+        .fillna({"Mensagens": 0})
+        .sort_values(["Canal", "Data"])
+    )
+
+    # Continuous cumulative line for every channel
+    full_daily["Acumulado"] = (
+        full_daily.groupby("Canal")["Mensagens"].cumsum()
+    )
+
+    fig = px.line(full_daily, x="Data", y="Acumulado", color="Canal")
+    fig.update_layout(
+        margin=dict(l=0, r=0, t=20, b=0),
+        yaxis_title="Mensagens acumuladas",
+        xaxis_title=""
+    )
     st.plotly_chart(fig, width="stretch")
 
 
@@ -566,7 +602,7 @@ def main():
         .nunique()
     )
 
-    st.title("BI Comunicação Plano Fixo")
+    st.title("BI Comunicação Fatura Fixa")
 
     f_int, f_com = apply_filters(interessados, comunicacoes)
 
@@ -595,7 +631,12 @@ def main():
         .set_index("Canal")["Mensagens"]
         .to_dict()
     )
+    total_messages = comunicacoes.loc[
+        comunicacoes["Canal"].isin(["Email", "WhatsApp", "SMS", "Push"]),
+        "Mensagens"
+    ].sum()
 
+    # First row: original summary cards
     render_metric_block(
         "Total",
         [
@@ -603,12 +644,21 @@ def main():
             ("Total de UCs interessadas", format_int(total_ucs_interessadas), "Total de UCs que demonstraram interesse."),
             ("UCs interessadas com contato", format_int(total_interested_with_contact), "UCs com pelo menos uma comunicação anterior ao interesse, sem aplicar filtros."),
             ("UCs interessadas sem contato", format_int(total_interested_without_contact), "UCs sem comunicação anterior ao interesse, sem aplicar filtros."),
+        ],
+        n_cols=4,
+    )
+    
+    # Remaining total metrics: 5 columns
+    render_metric_block(
+        "",
+        [
+            ("Mensagens totais", format_int(total_messages), "Total de mensagens enviadas, sem aplicar filtros."),
             ("Mensagens por Email", format_int(total_messages_by_channel.get("Email", 0)), "Total de mensagens de Email, sem aplicar filtros."),
             ("Mensagens por WhatsApp", format_int(total_messages_by_channel.get("WhatsApp", 0)), "Total de mensagens de WhatsApp, sem aplicar filtros."),
             ("Mensagens por SMS", format_int(total_messages_by_channel.get("SMS", 0)), "Total de mensagens de SMS, sem aplicar filtros."),
             ("Mensagens por Push", format_int(total_messages_by_channel.get("Push", 0)), "Total de mensagens de Push, sem aplicar filtros."),
         ],
-        n_cols=4,
+        n_cols=5,
     )
 
     render_metric_block(
@@ -619,7 +669,7 @@ def main():
             ("% do total de UCs interessadas", format_pct(pct_of_total_interested), "Percentual das UCs interessadas com contato sobre o total."),
             ("UCs interessadas sem contato", format_int(interested_without_contact_filtered), "UCs interessadas sem nenhuma comunicação anterior à data de interesse dentro dos filtros."),
             ("% do total de UCs interessadas sem contato", format_pct(pct_of_total_interested_without), "Percentual das UCs interessadas sem contato sobre o total."),
-            ("Mensagens filtradas", format_int(filtered_messages), "Total de mensagens após os filtros."),
+            ("Total Mensagens filtradas", format_int(filtered_messages), "Total de mensagens após os filtros."),
             ("Mensagens por Email", format_int(filtered_messages_by_channel.get("Email", 0)), "Mensagens de Email após os filtros."),
             ("Mensagens por WhatsApp", format_int(filtered_messages_by_channel.get("WhatsApp", 0)), "Mensagens de WhatsApp após os filtros."),
             ("Mensagens por SMS", format_int(filtered_messages_by_channel.get("SMS", 0)), "Mensagens de SMS após os filtros."),
