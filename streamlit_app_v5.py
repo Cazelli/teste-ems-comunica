@@ -570,10 +570,10 @@ def main():
     render_metric_block(
         "Total",
         [
-            ("UCs contactadas", format_int(total_contacted_ucs), "UCs únicas presentes nos arquivos IM + Email, sem aplicar filtros."),
-            ("Total de UCs interessadas", format_int(total_ucs_interessadas), "Total de UCs únicas no df_interessados."),
-            ("UCs interessadas com contato", format_int(total_interested_with_contact), "UCs interessadas com pelo menos uma comunicação anterior, sem aplicar filtros."),
-            ("% das UCs contactadas que demonstraram interesse", format_pct(total_pct_contacted_that_interested), "UCs interessadas com contato dividido pelas UCs contactadas dos arquivos IM + Email, sem aplicar filtros."),
+            ("UCs contactadas", format_int(total_contacted_ucs), "Total de UCs que receberam algum contato, sem aplicar filtros."),
+            ("Total de UCs interessadas", format_int(total_ucs_interessadas), "Total de UCs que demonstraram interesse."),
+            ("UCs interessadas com contato", format_int(total_interested_with_contact), "UCs com pelo menos uma comunicação anterior ao interesse, sem aplicar filtros."),
+            ("% das UCs contactadas que demonstraram interesse", format_pct(total_pct_contacted_that_interested), "UCs interessadas com contato dividido pelo total de UCs contactadas, sem aplicar filtros."),
             ("Mensagens por Email", format_int(total_messages_by_channel.get("Email", 0)), "Total de mensagens de Email, sem aplicar filtros."),
             ("Mensagens por WhatsApp", format_int(total_messages_by_channel.get("WhatsApp", 0)), "Total de mensagens de WhatsApp, sem aplicar filtros."),
             ("Mensagens por SMS", format_int(total_messages_by_channel.get("SMS", 0)), "Total de mensagens de SMS, sem aplicar filtros."),
