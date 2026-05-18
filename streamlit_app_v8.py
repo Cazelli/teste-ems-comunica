@@ -1453,7 +1453,7 @@ def render_comparison_page(interessados: pd.DataFrame, comunicacoes: pd.DataFram
     total_ucs_interessadas = interessados["NUM_UC"].dropna().nunique()
     cost_context = build_cost_context(comunicacoes, costs_df, total_ucs_interessadas)
     st.subheader("Comparativo entre grupos")
-    st.caption("Selecione uma categoria e compare até três grupos em métricas, custos e evolução acumulada.")
+    st.caption("Selecione uma categoria e compare quantos grupos quiser em métricas, custos e evolução acumulada.")
 
     f_int, f_com = filter_by_date_without_dynamic_filters(interessados, comunicacoes, "comparison")
 
@@ -1475,9 +1475,8 @@ def render_comparison_page(interessados: pd.DataFrame, comunicacoes: pd.DataFram
     options = get_comparison_options(f_int, f_com, group_col)
     with col_b:
         selected_values = st.multiselect(
-            "Selecione até 3 opções para comparar",
+            "Selecione as opções para comparar",
             options=options,
-            max_selections=3,
         )
 
     if not selected_values:
