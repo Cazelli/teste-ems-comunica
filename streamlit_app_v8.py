@@ -1392,14 +1392,40 @@ def render_overview_page(interessados: pd.DataFrame, comunicacoes: pd.DataFrame,
             "NUM_UC", "IND_SITUACAO", "DTH_INTERESSE", "MUNICIPIO", "PLANO_DETALHADO",
             "PRAZO_PLANO", "INFORME", "BANDEIRA", "RURAL", "TEM_COMUNICACAO"
         ]
+    
+        uc_search_int = st.text_input(
+            "Buscar NUM_UC",
+            key="search_uc_interessadas",
+            placeholder="Digite parte ou todo o NUM_UC",
+        ).strip()
+    
+        int_table = f_int[show_cols].copy()
+    
+        if uc_search_int:
+            int_table = int_table[
+                int_table["NUM_UC"].astype(str).str.contains(uc_search_int, case=False, na=False)
+            ]
+    
         st.dataframe(
-            f_int[show_cols].sort_values(["MUNICIPIO", "NUM_UC"], ascending=[True, True]),
+            int_table.sort_values(["MUNICIPIO", "NUM_UC"], ascending=[True, True]),
             width="stretch",
             height=350,
+            hide_index=True,
         )
 
     with st.expander("Tabela de comunicações filtradas"):
         comm_report = build_filtered_communications_summary(f_com, cost_context)
+    
+        uc_search_com = st.text_input(
+            "Buscar NUM_UC",
+            key="search_uc_comunicacoes",
+            placeholder="Digite parte ou todo o NUM_UC",
+        ).strip()
+    
+        if uc_search_com:
+            comm_report = comm_report[
+                comm_report["NUM_UC"].astype(str).str.contains(uc_search_com, case=False, na=False)
+            ]
     
         sort_col = st.selectbox(
             "Ordenar tabela por",
