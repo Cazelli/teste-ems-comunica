@@ -778,9 +778,9 @@ def render_cost_report(cost_context: dict):
         cost_rows.append(
             {
                 "Canal": channel,
-                "Envios reportados": reported,
+                "Envios": reported,
                 "Mensagens com UC conhecida": known_msgs,
-                "Mensagens sem UC no report": max(reported - known_msgs, 0),
+                "Mensagens sem UC no relatório": max(reported - known_msgs, 0),
                 "Custo total": row["investimento"],
                 "Custo/envio reportado": row["custo_unitario_reportado"],
                 "Custo/msg com UC conhecida": cost_context["rates_known"].get(channel, 0),
@@ -788,7 +788,37 @@ def render_cost_report(cost_context: dict):
         )
 
     with st.expander("Detalhamento de custos de mensageria"):
-        st.dataframe(pd.DataFrame(cost_rows), width="stretch", height=180)
+        st.dataframe(
+            pd.DataFrame(cost_rows),
+            width="stretch",
+            height=180,
+            column_config={
+                "Envios reportados": st.column_config.NumberColumn(
+                    "Envios reportados",
+                    format="%d",
+                ),
+                "Mensagens com UC conhecida": st.column_config.NumberColumn(
+                    "Mensagens com UC conhecida",
+                    format="%d",
+                ),
+                "Mensagens sem UC no report": st.column_config.NumberColumn(
+                    "Mensagens sem UC no report",
+                    format="%d",
+                ),
+                "Custo total": st.column_config.NumberColumn(
+                    "Custo total",
+                    format="R$ %.2f",
+                ),
+                "Custo/envio reportado": st.column_config.NumberColumn(
+                    "Custo/envio reportado",
+                    format="R$ %.4f",
+                ),
+                "Custo/msg com UC conhecida": st.column_config.NumberColumn(
+                    "Custo/msg com UC conhecida",
+                    format="R$ %.4f",
+                ),
+            },
+        )
 
     with st.expander("Detalhamento de investimento em mídia"):
         show_cols = ["item", "cliques", "investimento", "custo_unitario_reportado", "base_calculo"]
