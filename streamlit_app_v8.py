@@ -1245,7 +1245,25 @@ def render_comparison_page(interessados: pd.DataFrame, comunicacoes: pd.DataFram
             detail_rows.append(by_channel)
         if detail_rows:
             detail_df = pd.concat(detail_rows, ignore_index=True)
-            st.dataframe(detail_df, width="stretch", height=300)
+            st.dataframe(
+                detail_df,
+                width="stretch",
+                height=300,
+                column_config={
+                    "Mensagens": st.column_config.NumberColumn(
+                        "Mensagens",
+                        format="%d",
+                    ),
+                    "Custo_estimado": st.column_config.NumberColumn(
+                        "Custo estimado",
+                        format="R$ %.2f",
+                    ),
+                    "UCs": st.column_config.NumberColumn(
+                        "UCs",
+                        format="%d",
+                    ),
+                },
+            )
         else:
             st.info("Sem mensagens para detalhar.")
 
