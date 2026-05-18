@@ -1074,20 +1074,111 @@ def build_comparison_summary(
     return pd.DataFrame(rows)
 
 
-def plot_comparison_bars(summary: pd.DataFrame):
+def plot_comparison_interested_bars(summary: pd.DataFrame):
+    """Single-purpose bar chart for interested UCs only."""
     if summary.empty:
         st.info("Selecione ao menos uma opção para comparar.")
         return
-    metrics = [
-        "UCs interessadas",
-        "UCs interessadas com contato",
-        "UCs interessadas sem contato",
-        "Mensagens totais",
-        "Custo mensageria estimado",
-    ]
-    long_df = summary.melt(id_vars="Grupo", value_vars=metrics, var_name="Métrica", value_name="Valor")
-    fig = px.bar(long_df, x="Grupo", y="Valor", color="Métrica", barmode="group")
-    fig.update_layout(title="Comparativo de métricas", margin=dict(l=0, r=0, t=40, b=0), xaxis_title="")
+
+    fig = px.bar(
+        summary.sort_values("UCs interessadas", ascending=False),
+        x="Grupo",
+        y="UCs interessadas",
+        color="Grupo",
+        text="UCs interessadas",
+    )
+    fig.update_traces(textposition="outside")
+    fig.update_layout(
+        title="UCs interessadas por grupo",
+        margin=dict(l=0, r=0, t=40, b=0),
+        xaxis_title="",
+        yaxis_title="UCs interessadas",
+        legend_title="Grupo",
+    )
+    st.plotly_chart(fig, width="stretch")
+
+
+def build_cost_per_uc_by_channel_summary(
+    interessados: pd.DataFrame,
+    comunicacoes: pd.DataFrame,
+    group_col: str,
+    selected_values: list[str],
+    cost_context: dict,
+) -> pd.DataFrame:
+    """Build a grouped table with estimated messaging cost per contacted UC by channel."""
+    rows = []
+    for value in selected_values:
+        _, c_slice = slice_for_comparison_value(interessados, comunicacoes, group_col, value)
+        c_costed = add_cost_columns(c_slice, cost_context)
+        if c_costed.empty:
+            continue
+
+        by_channel = (
+            c_costed[c_costed["Canal"].isin(cost_context["costed_message_channels"])]
+            .groupby("Canal", as_index=False)
+            .agg(
+                UCs=("NUM_UC", pd.Series.nunique),
+                Mensagens=("Mensagens", "sum"),
+                Custo_total=("Custo estimado", "sum"),
+            )
+        )
+        for _, row in by_channel.iterrows():
+            ucs = float(row["UCs"]) if pd.notna(row["UCs"]) else 0.0
+            rows.append(
+                {
+                    "Grupo": value,
+                    "Canal": row["Canal"],
+                    "UCs": ucs,
+                    "Mensagens": float(row["Mensagens"]) if pd.notna(row["Mensagens"]) else 0.0,
+                    "Custo total": float(row["Custo_total"]) if pd.notna(row["Custo_total"]) else 0.0,
+                    "Custo por UC": float(row["Custo_total"]) / ucs if ucs > 0 else 0.0,
+                }
+            )
+
+    return pd.DataFrame(rows)
+
+
+def plot_cost_per_uc_by_channel_bars(
+    interessados: pd.DataFrame,
+    comunicacoes: pd.DataFrame,
+    group_col: str,
+    selected_values: list[str],
+    cost_context: dict,
+):
+    cost_uc = build_cost_per_uc_by_channel_summary(
+        interessados,
+        comunicacoes,
+        group_col,
+        selected_values,
+        cost_context,
+    )
+
+    if cost_uc.empty:
+        st.info("Sem dados de custo por UC para os grupos selecionados.")
+        return
+
+    fig = px.bar(
+        cost_uc,
+        x="Grupo",
+        y="Custo por UC",
+        color="Canal",
+        barmode="group",
+        text="Custo por UC",
+        hover_data={
+            "UCs": ":,.0f",
+            "Mensagens": ":,.0f",
+            "Custo total": ":,.2f",
+            "Custo por UC": ":,.2f",
+        },
+    )
+    fig.update_traces(texttemplate="R$ %{y:.2f}", textposition="outside")
+    fig.update_layout(
+        title="Custo por UC por canal",
+        margin=dict(l=0, r=0, t=40, b=0),
+        xaxis_title="",
+        yaxis_title="Custo por UC",
+        legend_title="Canal",
+    )
     st.plotly_chart(fig, width="stretch")
 
 
@@ -1400,13 +1491,19 @@ def render_comparison_page(interessados: pd.DataFrame, comunicacoes: pd.DataFram
         display_summary[col] = display_summary[col].map(lambda x: format_int(x))
     for col in ["Custo mensageria estimado", "Custo por mensagem conhecida"]:
         display_summary[col] = display_summary[col].map(format_currency)
-    for col in ["Média contatos antes interesse", "Média dias desde última msg", "Máx. dias desde última msg"]:
+    for col in ["Média contatos antes interesse"]:
         display_summary[col] = display_summary[col].map(lambda x: format_decimal(x))
+    for col in ["Média dias desde última msg", "Máx. dias desde última msg"]:
+        display_summary[col] = display_summary[col].map(lambda x: format_int(x))
 
     st.markdown("### Resumo comparativo")
     st.dataframe(display_summary, width="stretch", height=180)
 
-    plot_comparison_bars(summary)
+    graph_bar1, graph_bar2 = st.columns(2)
+    with graph_bar1:
+        plot_comparison_interested_bars(summary)
+    with graph_bar2:
+        plot_cost_per_uc_by_channel_bars(f_int, f_com, group_col, selected_values, cost_context)
 
     graph_col1, graph_col2 = st.columns(2)
     with graph_col1:
