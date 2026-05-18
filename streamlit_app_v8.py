@@ -666,7 +666,11 @@ def format_currency(value) -> str:
     return "R$ " + f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def build_cost_context(comunicacoes: pd.DataFrame, costs_df: pd.DataFrame) -> dict:
+def build_cost_context(
+    comunicacoes: pd.DataFrame,
+    costs_df: pd.DataFrame,
+    total_ucs_interessadas: int,
+) -> dict:
     """Build cost totals and rates from custos_comunicacao.csv."""
     messaging_costs = costs_df[
         (costs_df["tipo"] == COST_TYPE_MESSAGING)
@@ -966,11 +970,10 @@ def plot_comparison_cumulative_messages(comunicacoes: pd.DataFrame, group_col: s
 
 
 def render_overview_page(interessados: pd.DataFrame, comunicacoes: pd.DataFrame, costs_df: pd.DataFrame):
-    cost_context = build_cost_context(comunicacoes, costs_df)
+    total_ucs_interessadas = interessados["NUM_UC"].dropna().nunique()
+    cost_context = build_cost_context(comunicacoes, costs_df, total_ucs_interessadas)
 
     f_int, f_com = apply_filters(interessados, comunicacoes)
-
-    total_ucs_interessadas = interessados["NUM_UC"].dropna().nunique()
     total_contacted_ucs = comunicacoes["NUM_UC"].dropna().nunique()
     total_messages_by_channel = (
         comunicacoes.groupby("Canal", as_index=False)["Mensagens"]
@@ -1129,7 +1132,8 @@ def render_overview_page(interessados: pd.DataFrame, comunicacoes: pd.DataFrame,
 
 
 def render_comparison_page(interessados: pd.DataFrame, comunicacoes: pd.DataFrame, costs_df: pd.DataFrame):
-    cost_context = build_cost_context(comunicacoes, costs_df)
+    total_ucs_interessadas = interessados["NUM_UC"].dropna().nunique()
+    cost_context = build_cost_context(comunicacoes, costs_df, total_ucs_interessadas)
     st.subheader("Comparativo entre grupos")
     st.caption("Selecione uma categoria e compare até três grupos em métricas, custos e evolução acumulada.")
 
