@@ -479,6 +479,102 @@ def format_pct(value: float) -> str:
     return f"{value:,.2f}%".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def format_decimal(value, decimals: int = 2) -> str:
+    if pd.isna(value):
+        return "0"
+    return f"{float(value):,.{decimals}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def build_interest_contact_metrics(interessados_df: pd.DataFrame, comunicacoes_df: pd.DataFrame) -> dict:
+    """
+    Metrics based on messages sent before each UC's date of interest.
+
+    The calculation uses the communication rows available in the current scope.
+    For the Total section this means all communications; for Filtrado and
+    Comparativo this means only the currently filtered/comparison communications.
+    """
+    base = interessados_df[
+        interessados_df["IND_SITUACAO"].isin(INTEREST_STATUSES)
+    ].copy()
+
+    if base.empty or comunicacoes_df.empty:
+        return {
+            "avg_contacts_before_interest": 0.0,
+            "max_contacts_before_interest": 0.0,
+            "avg_days_since_last_message": 0.0,
+            "max_days_since_last_message": 0.0,
+        }
+
+    base = base.dropna(subset=["NUM_UC", "DTH_INTERESSE"]).copy()
+    if base.empty:
+        return {
+            "avg_contacts_before_interest": 0.0,
+            "max_contacts_before_interest": 0.0,
+            "avg_days_since_last_message": 0.0,
+            "max_days_since_last_message": 0.0,
+        }
+
+    base = base[["NUM_UC", "DTH_INTERESSE"]].copy()
+    base["_INTEREST_ROW_ID"] = np.arange(len(base), dtype=int)
+
+    comm = comunicacoes_df.dropna(subset=["NUM_UC", "Data"]).copy()
+    if comm.empty:
+        return {
+            "avg_contacts_before_interest": 0.0,
+            "max_contacts_before_interest": 0.0,
+            "avg_days_since_last_message": 0.0,
+            "max_days_since_last_message": 0.0,
+        }
+
+    comm = comm[comm["NUM_UC"].isin(base["NUM_UC"].dropna().unique())].copy()
+    comm = comm[comm["Data"] <= base["DTH_INTERESSE"].max()].copy()
+    if comm.empty:
+        return {
+            "avg_contacts_before_interest": 0.0,
+            "max_contacts_before_interest": 0.0,
+            "avg_days_since_last_message": 0.0,
+            "max_days_since_last_message": 0.0,
+        }
+
+    merged = base.merge(
+        comm[["NUM_UC", "Data", "Mensagens"]],
+        on="NUM_UC",
+        how="left",
+    )
+    before_interest = merged[
+        merged["Data"].notna()
+        & (merged["Data"] <= merged["DTH_INTERESSE"])
+    ].copy()
+
+    if before_interest.empty:
+        return {
+            "avg_contacts_before_interest": 0.0,
+            "max_contacts_before_interest": 0.0,
+            "avg_days_since_last_message": 0.0,
+            "max_days_since_last_message": 0.0,
+        }
+
+    per_interest = (
+        before_interest
+        .groupby("_INTEREST_ROW_ID", as_index=False)
+        .agg(
+            contacts_before_interest=("Mensagens", "sum"),
+            last_message_date=("Data", "max"),
+            interest_date=("DTH_INTERESSE", "first"),
+        )
+    )
+    per_interest["days_since_last_message"] = (
+        per_interest["interest_date"] - per_interest["last_message_date"]
+    ).dt.total_seconds() / 86400
+
+    return {
+        "avg_contacts_before_interest": per_interest["contacts_before_interest"].mean(),
+        "max_contacts_before_interest": per_interest["contacts_before_interest"].max(),
+        "avg_days_since_last_message": per_interest["days_since_last_message"].mean(),
+        "max_days_since_last_message": per_interest["days_since_last_message"].max(),
+    }
+
+
 def render_metric_block(title: str, metrics: list[tuple[str, str, str]], n_cols: int = 7):
     st.markdown(f"### {title}")
     for start in range(0, len(metrics), n_cols):
@@ -954,6 +1050,7 @@ def build_comparison_summary(
         )
         estimated_cost = estimate_messaging_cost(c_slice, cost_context)
         total_messages = float(c_slice["Mensagens"].sum()) if not c_slice.empty else 0.0
+        contact_metrics = build_interest_contact_metrics(i_slice, c_slice)
 
         rows.append(
             {
@@ -968,6 +1065,10 @@ def build_comparison_summary(
                 "Mensagens Email": float(messages_by_channel.get("Email", 0)),
                 "Custo mensageria estimado": estimated_cost,
                 "Custo por mensagem conhecida": estimated_cost / total_messages if total_messages > 0 else 0,
+                "Média contatos antes interesse": contact_metrics["avg_contacts_before_interest"],
+                "Máx. mensagens antes interesse": contact_metrics["max_contacts_before_interest"],
+                "Média dias desde última msg": contact_metrics["avg_days_since_last_message"],
+                "Máx. dias desde última msg": contact_metrics["max_days_since_last_message"],
             }
         )
     return pd.DataFrame(rows)
@@ -1065,6 +1166,7 @@ def render_overview_page(interessados: pd.DataFrame, comunicacoes: pd.DataFrame,
         .dropna()
         .nunique()
     )
+    total_interest_contact_metrics = build_interest_contact_metrics(interessados, comunicacoes)
 
     interested_filtered = f_int[f_int["IND_SITUACAO"].isin(INTEREST_STATUSES)]["NUM_UC"].dropna().nunique()
     interested_with_contact_filtered = (
@@ -1091,6 +1193,7 @@ def render_overview_page(interessados: pd.DataFrame, comunicacoes: pd.DataFrame,
         .set_index("Canal")["Mensagens"]
         .to_dict()
     )
+    filtered_interest_contact_metrics = build_interest_contact_metrics(f_int, f_com)
     total_messages = comunicacoes.loc[
         comunicacoes["Canal"].isin(["Email", "WhatsApp", "SMS", "Push"]),
         "Mensagens"
@@ -1103,6 +1206,10 @@ def render_overview_page(interessados: pd.DataFrame, comunicacoes: pd.DataFrame,
             ("Total de UCs interessadas", format_int(total_ucs_interessadas), "Total de UCs que demonstraram interesse."),
             ("UCs interessadas com contato", format_int(total_interested_with_contact), "UCs com pelo menos uma comunicação anterior ao interesse, sem aplicar filtros."),
             ("UCs interessadas sem contato", format_int(total_interested_without_contact), "UCs sem comunicação anterior ao interesse, sem aplicar filtros."),
+            ("Média contatos antes interesse", format_decimal(total_interest_contact_metrics["avg_contacts_before_interest"]), "Média de mensagens enviadas antes da data de interesse."),
+            ("Máx. mensagens antes interesse", format_int(total_interest_contact_metrics["max_contacts_before_interest"]), "Maior quantidade de mensagens enviadas antes da data de interesse para uma UC."),
+            ("Média dias desde última msg", format_decimal(total_interest_contact_metrics["avg_days_since_last_message"]), "Média de dias entre a última mensagem anterior e a data de interesse."),
+            ("Máx. dias desde última msg", format_decimal(total_interest_contact_metrics["max_days_since_last_message"]), "Maior intervalo em dias entre a última mensagem anterior e a data de interesse."),
         ],
         n_cols=4,
     )
@@ -1131,6 +1238,10 @@ def render_overview_page(interessados: pd.DataFrame, comunicacoes: pd.DataFrame,
             ("% do total de UCs interessadas sem contato", format_pct(pct_of_total_interested_without), "Percentual das UCs interessadas sem contato sobre o total."),
             ("Total Mensagens filtradas", format_int(filtered_messages), "Total de mensagens após os filtros."),
             ("Custo mensageria filtrado", format_currency(estimate_messaging_cost(f_com, cost_context)), "Custo estimado com base no custo por mensagem com UC conhecida."),
+            ("Média contatos antes interesse", format_decimal(filtered_interest_contact_metrics["avg_contacts_before_interest"]), "Média de mensagens filtradas antes da data de interesse."),
+            ("Máx. mensagens antes interesse", format_int(filtered_interest_contact_metrics["max_contacts_before_interest"]), "Maior quantidade de mensagens filtradas antes da data de interesse para uma UC."),
+            ("Média dias desde última msg", format_decimal(filtered_interest_contact_metrics["avg_days_since_last_message"]), "Média de dias entre a última mensagem filtrada anterior e a data de interesse."),
+            ("Máx. dias desde última msg", format_decimal(filtered_interest_contact_metrics["max_days_since_last_message"]), "Maior intervalo em dias entre a última mensagem filtrada anterior e a data de interesse."),
             ("Mensagens por Email", format_int(filtered_messages_by_channel.get("Email", 0)), "Mensagens de Email após os filtros."),
             ("Mensagens por WhatsApp", format_int(filtered_messages_by_channel.get("WhatsApp", 0)), "Mensagens de WhatsApp após os filtros."),
             ("Mensagens por SMS", format_int(filtered_messages_by_channel.get("SMS", 0)), "Mensagens de SMS após os filtros."),
@@ -1285,10 +1396,12 @@ def render_comparison_page(interessados: pd.DataFrame, comunicacoes: pd.DataFram
     summary = build_comparison_summary(f_int, f_com, group_col, selected_values, cost_context)
 
     display_summary = summary.copy()
-    for col in ["Mensagens totais", "Mensagens Push", "Mensagens SMS", "Mensagens WhatsApp", "Mensagens Email"]:
+    for col in ["Mensagens totais", "Mensagens Push", "Mensagens SMS", "Mensagens WhatsApp", "Mensagens Email", "Máx. mensagens antes interesse"]:
         display_summary[col] = display_summary[col].map(lambda x: format_int(x))
     for col in ["Custo mensageria estimado", "Custo por mensagem conhecida"]:
         display_summary[col] = display_summary[col].map(format_currency)
+    for col in ["Média contatos antes interesse", "Média dias desde última msg", "Máx. dias desde última msg"]:
+        display_summary[col] = display_summary[col].map(lambda x: format_decimal(x))
 
     st.markdown("### Resumo comparativo")
     st.dataframe(display_summary, width="stretch", height=180)
