@@ -822,8 +822,7 @@ def render_cost_report(cost_context: dict):
                 "item": "Mídia",
                 "cliques": "Cliques",
                 "investimento": "Investimento",
-                "custo_unitario_reportado": "Custo por clique",
-                "base_calculo": "Base de cálculo",
+                "custo_unitario_reportado": "Custo por clique",                
             }
         )
         
@@ -842,7 +841,7 @@ def render_cost_report(cost_context: dict):
                 ),
                 "Custo por clique": st.column_config.NumberColumn(
                     "Custo por clique",
-                    format="R$ %.4f",
+                    format="R$ %.2f",
                 ),
             },
         )
