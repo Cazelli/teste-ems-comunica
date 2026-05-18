@@ -703,6 +703,8 @@ def build_cost_context(comunicacoes: pd.DataFrame, costs_df: pd.DataFrame) -> di
     total_messaging_cost = messaging_costs["investimento"].fillna(0).sum()
     total_media_cost = media_costs["investimento"].fillna(0).sum()
     total_general_cost = total_messaging_cost + total_media_cost
+    avrg_cost_per_UC = total_general_cost/total_ucs_interessadas if total_ucs_interessadas > 0 else 0
+    avrg_cost_per_UC_msg = total_messaging_cost/total_ucs_interessadas if total_ucs_interessadas > 0 else 0
 
     return {
         "costs_df": costs_df,
@@ -717,7 +719,8 @@ def build_cost_context(comunicacoes: pd.DataFrame, costs_df: pd.DataFrame) -> di
         "total_messaging_cost": total_messaging_cost,
         "total_media_cost": total_media_cost,
         "total_general_cost": total_general_cost,
-        "cost_per_known_message": total_messaging_cost / known_costed_messages if known_costed_messages > 0 else 0,
+        "cost_per_UC": avrg_cost_per_UC,
+        "cost_per_UC_msg": avrg_cost_per_UC_msg,
     }
 
 
@@ -751,13 +754,14 @@ def render_cost_report(cost_context: dict):
     render_metric_block(
         "",
         [
-            ("Custo total geral", format_currency(cost_context["total_general_cost"]), "Mensageria + mídia, conforme custos_comunicacao.csv."),
-            ("Custo de mensageria", format_currency(cost_context["total_messaging_cost"]), "Push + SMS + WhatsApp, conforme custos_comunicacao.csv."),
-            ("Investimento em mídia", format_currency(cost_context["total_media_cost"]), "Soma das linhas de mídia no custos_comunicacao.csv."),
-            ("Envios reportados", format_int(cost_context["total_messaging_reported_sends"]), "Total oficial de envios da tabela de custos."),
-            ("Mensagens com UC conhecida", format_int(cost_context["known_costed_messages"]), "Mensagens presentes no app com NUM_UC identificado."),
-            ("Mensagens sem UC no report", format_int(cost_context["messages_without_user_report"]), "Diferença positiva entre o total reportado no CSV e as mensagens com UC conhecida no app."),
-            ("Custo por msg com UC", format_currency(cost_context["cost_per_known_message"]), "Custo de mensageria dividido pelas mensagens com UC conhecida no app."),
+            ("Custo Total Geral", format_currency(cost_context["total_general_cost"]), "Mensagens + Mídia"),
+            ("Custo de Mensagens", format_currency(cost_context["total_messaging_cost"]), "Push + SMS + WhatsApp"),
+            ("Investimento em Mídia", format_currency(cost_context["total_media_cost"]), "Custo total com Meta + Google + OneStation + Rádio e TV"),
+            ("Mensagens Total", format_int(cost_context["total_messaging_reported_sends"]), "Total oficial de envios contratados."),
+            ("Mensagens com UC", format_int(cost_context["known_costed_messages"]), "Mensagens presentes no relatório"),
+            ("Mensagens sem UC", format_int(cost_context["messages_without_user_report"]), "Diferença entre os ralatórios."),
+            ("Custo Total por UC", format_currency(cost_context["cost_per_UC"]), "Custo por mensagem total"),
+            ("Custo Mensagem por UC", format_currency(cost_context["cost_per_UC_msg"]), "Custo por mensagem total"),
         ],
         n_cols=4,
     )
