@@ -223,14 +223,13 @@ def load_costs_csv() -> pd.DataFrame:
         "envios_reportados",
         "cliques",
         "investimento",
-        "custo_unitario_reportado",
-        "base_calculo",
+        "custo_unitario_reportado",        
     }
     missing = required_cols - set(costs.columns)
     if missing:
         raise ValueError(f"Colunas ausentes em {COSTS_FILENAME}: {sorted(missing)}")
 
-    for col in ["tipo", "item", "canal", "base_calculo"]:
+    for col in ["tipo", "item", "canal"]:
         costs[col] = costs[col].fillna("").astype(str).str.strip()
 
     for col in ["envios_reportados", "cliques", "investimento", "custo_unitario_reportado"]:
@@ -816,7 +815,7 @@ def render_cost_report(cost_context: dict):
         )
 
     with st.expander("Detalhamento de investimento em mídia"):
-        show_cols = ["item", "cliques", "investimento", "custo_unitario_reportado", "base_calculo"]
+        show_cols = ["item", "cliques", "investimento", "custo_unitario_reportado"]
         media_detail = cost_context["media_costs"][show_cols].rename(
             columns={
                 "item": "Mídia",
