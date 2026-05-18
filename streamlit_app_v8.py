@@ -1198,11 +1198,32 @@ def render_overview_page(interessados: pd.DataFrame, comunicacoes: pd.DataFrame,
 
     with st.expander("Tabela de comunicações filtradas"):
         comm_report = build_filtered_communications_summary(f_com, cost_context)
-
+    
+        sort_col = st.selectbox(
+            "Ordenar tabela por",
+            options=["NUM_UC", "Canal", "Template", "Mensagens", "Custo total"],
+            index=0,
+            key="comm_table_sort_col",
+        )
+    
+        sort_order = st.radio(
+            "Ordem",
+            options=["Crescente", "Decrescente"],
+            horizontal=True,
+            key="comm_table_sort_order",
+        )
+    
+        comm_report_sorted = comm_report.sort_values(
+            by=sort_col,
+            ascending=(sort_order == "Crescente"),
+            kind="mergesort",
+        )
+    
         st.dataframe(
-            comm_report,
+            comm_report_sorted,
             width="stretch",
-            height=350,
+            height=500,
+            hide_index=True,
             column_config={
                 "NUM_UC": st.column_config.NumberColumn(
                     "NUM_UC",
