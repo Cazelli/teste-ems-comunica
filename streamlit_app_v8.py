@@ -757,6 +757,30 @@ def add_cost_columns(df: pd.DataFrame, cost_context: dict) -> pd.DataFrame:
     return df
 
 
+def build_filtered_communications_summary(df: pd.DataFrame, cost_context: dict) -> pd.DataFrame:
+    """Aggregate filtered communications by UC, channel and template/action."""
+    if df.empty:
+        return pd.DataFrame(columns=["NUM_UC", "Canal", "Template", "Mensagens", "Custo total"] )
+
+    comm_costed = add_cost_columns(df, cost_context)
+
+    summary = (
+        comm_costed
+        .groupby(["NUM_UC", "Canal", "Template_Acao_Grupo"], dropna=False, as_index=False)
+        .agg(
+            Mensagens=("Mensagens", "sum"),
+            Custo_total=("Custo estimado", "sum"),
+        )
+        .rename(columns={
+            "Template_Acao_Grupo": "Template",
+            "Custo_total": "Custo total",
+        })
+        .sort_values(["NUM_UC", "Canal", "Template"], ascending=[True, True, True])
+    )
+
+    return summary[["NUM_UC", "Canal", "Template", "Mensagens", "Custo total"]]
+
+
 def render_cost_report(cost_context: dict):
     st.markdown("### Custos gerais")
     render_metric_block(
@@ -1173,15 +1197,32 @@ def render_overview_page(interessados: pd.DataFrame, comunicacoes: pd.DataFrame,
         )
 
     with st.expander("Tabela de comunicações filtradas"):
-        show_cols = [
-            "NUM_UC", "Data", "Canal", "Template_Acao_Grupo", "Mensagens",
-            "MUNICIPIO", "PLANO_DETALHADO", "PRAZO_PLANO", "INFORME", "BANDEIRA", "RURAL"
-        ]
-        comm_report = add_cost_columns(f_com[show_cols].copy(), cost_context)
+        comm_report = build_filtered_communications_summary(f_com, cost_context)
+
         st.dataframe(
-            comm_report.sort_values(["Data", "NUM_UC"], ascending=[False, True]),
+            comm_report,
             width="stretch",
             height=350,
+            column_config={
+                "NUM_UC": st.column_config.NumberColumn(
+                    "NUM_UC",
+                    format="%d",
+                ),
+                "Canal": st.column_config.TextColumn(
+                    "Canal",
+                ),
+                "Template": st.column_config.TextColumn(
+                    "Template",
+                ),
+                "Mensagens": st.column_config.NumberColumn(
+                    "Mensagens",
+                    format="%d",
+                ),
+                "Custo total": st.column_config.NumberColumn(
+                    "Custo total",
+                    format="R$ %.2f",
+                ),
+            },
         )
 
 
