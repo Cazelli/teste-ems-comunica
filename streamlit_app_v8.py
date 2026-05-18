@@ -782,8 +782,7 @@ def render_cost_report(cost_context: dict):
                 "Mensagens com UC conhecida": known_msgs,
                 "Mensagens sem UC no relatório": max(reported - known_msgs, 0),
                 "Custo total": row["investimento"],
-                "Custo/envio reportado": row["custo_unitario_reportado"],
-                "Custo/msg com UC conhecida": cost_context["rates_known"].get(channel, 0),
+                "Custo/envio": row["custo_unitario_reportado"],                
             }
         )
 
@@ -810,7 +809,7 @@ def render_cost_report(cost_context: dict):
                     format="R$ %.2f",
                 ),
                 "Custo/envio": st.column_config.NumberColumn(
-                    "Custo/envio reportado",
+                    "Custo/envio",
                     format="R$ %.2f",
                 ),                
             },
