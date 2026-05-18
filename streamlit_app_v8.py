@@ -809,31 +809,43 @@ def render_cost_report(cost_context: dict):
                     "Custo total",
                     format="R$ %.2f",
                 ),
-                "Custo/envio reportado": st.column_config.NumberColumn(
+                "Custo/envio": st.column_config.NumberColumn(
                     "Custo/envio reportado",
-                    format="R$ %.4f",
-                ),
-                "Custo/msg com UC conhecida": st.column_config.NumberColumn(
-                    "Custo/msg com UC conhecida",
-                    format="R$ %.4f",
-                ),
+                    format="R$ %.2f",
+                ),                
             },
         )
 
     with st.expander("Detalhamento de investimento em mídia"):
         show_cols = ["item", "cliques", "investimento", "custo_unitario_reportado", "base_calculo"]
+        media_detail = cost_context["media_costs"][show_cols].rename(
+            columns={
+                "item": "Mídia",
+                "cliques": "Cliques",
+                "investimento": "Investimento",
+                "custo_unitario_reportado": "Custo por clique",
+                "base_calculo": "Base de cálculo",
+            }
+        )
+        
         st.dataframe(
-            cost_context["media_costs"][show_cols].rename(
-                columns={
-                    "item": "Mídia",
-                    "cliques": "Cliques",
-                    "investimento": "Investimento",
-                    "custo_unitario_reportado": "Custo por clique",
-                    "base_calculo": "Base de cálculo",
-                }
-            ),
+            media_detail,
             width="stretch",
             height=240,
+            column_config={
+                "Cliques": st.column_config.NumberColumn(
+                    "Cliques",
+                    format="%d",
+                ),
+                "Investimento": st.column_config.NumberColumn(
+                    "Investimento",
+                    format="R$ %.2f",
+                ),
+                "Custo por clique": st.column_config.NumberColumn(
+                    "Custo por clique",
+                    format="R$ %.4f",
+                ),
+            },
         )
 
 
