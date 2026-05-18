@@ -654,7 +654,12 @@ def plot_bar(df: pd.DataFrame, group_col: str, title: str, metric_name: str = "U
         .rename(columns={"NUM_UC": metric_name})
         .sort_values(metric_name, ascending=False)
     )
-    fig = px.bar(base, x=group_col, y=metric_name)
+    fig = px.bar(
+        base,
+        x=group_col,
+        y=metric_name,
+        color=group_col,
+    )
     fig.update_layout(title=title, margin=dict(l=0, r=0, t=40, b=0), xaxis_title="")
     st.plotly_chart(fig, width="stretch")
 
@@ -1127,7 +1132,12 @@ def render_overview_page(interessados: pd.DataFrame, comunicacoes: pd.DataFrame,
     with comm_col1:
         if not f_com.empty:
             by_canal = f_com.groupby("Canal", as_index=False)["Mensagens"].sum().sort_values("Mensagens", ascending=False)
-            fig = px.bar(by_canal, x="Canal", y="Mensagens")
+            fig = px.bar(
+                by_canal,
+                x="Canal",
+                y="Mensagens",
+                color="Canal",
+            )
             fig.update_layout(title="Mensagens por canal", margin=dict(l=0, r=0, t=40, b=0), xaxis_title="")
             st.plotly_chart(fig, width="stretch")
         else:
@@ -1140,7 +1150,12 @@ def render_overview_page(interessados: pd.DataFrame, comunicacoes: pd.DataFrame,
                 .sort_values("Mensagens", ascending=False)
                 .head(20)
             )
-            fig = px.bar(by_template, x="Template_Acao_Grupo", y="Mensagens")
+            fig = px.bar(
+                by_template,
+                x="Template_Acao_Grupo",
+                y="Mensagens",
+                color="Template_Acao_Grupo",
+            )
             fig.update_layout(title="Mensagens por template / ação", margin=dict(l=0, r=0, t=40, b=0), xaxis_title="")
             st.plotly_chart(fig, width="stretch")
         else:
