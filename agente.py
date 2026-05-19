@@ -10,7 +10,7 @@ from datetime import datetime
 EMAIL_REMETENTE = os.environ["EMAIL_REMETENTE"]
 EMAIL_SENHA     = os.environ["EMAIL_SENHA"]
 EMAIL_DESTINO   = "pedro.cazelli@essenzsolucoes.com"
-URL             = "https://imers-o-dados-jan-2026-cazelli.streamlit.app/"
+URL             = "https://ems-comunicacao-hqspptav8hnr6krdnpvs5g.streamlit.app/"
 
 # ─── ENVIAR E-MAIL DE SUCESSO ─────────────────────────────────────────────────
 def enviar_email_sucesso(horario: str):
