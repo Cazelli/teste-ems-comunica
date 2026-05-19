@@ -22,10 +22,9 @@ jobs:
           python-version: '3.11'
 
       - name: Instalar dependências
-        run: pip install -r requirements.txt
-
-      - name: Instalar Chromium via Playwright
-        run: playwright install chromium
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install chromium
 
       - name: Executar agente
         env:
