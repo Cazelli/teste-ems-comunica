@@ -6,3 +6,4 @@ numpy>=1.26
 folium>=0.17
 streamlit-folium>=0.22
 streamlit-dynamic-filters>=0.1.9
+playwright
